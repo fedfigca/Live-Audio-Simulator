@@ -1,6 +1,7 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
 
 const tracks = [
   { name: 'Late Night Transit', artist: 'Signal Bloom', duration: '03:42' },
@@ -8,9 +9,90 @@ const tracks = [
   { name: 'Soft Focus', artist: 'North Arcade', duration: '02:56' },
 ]
 
+function formatPortSummary(device: DeviceSummary): string {
+  return device.ports
+    .map((port) => {
+      const acceptedConnectors = port.acceptedConnectors?.length
+        ? ` (${port.acceptedConnectors.join(' / ')})`
+        : ''
+      const channels = port.channels ? `${port.channels}ch` : ''
+      const signal = port.signalLevel ?? ''
+      const power = port.providesPhantomPower ? ' +48V' : port.requiresPhantomPower ? ' phantom' : ''
+
+      return `${port.name}: ${port.connector}${acceptedConnectors} ${channels} ${signal}${power}`.trim()
+    })
+    .join(' · ')
+}
+
+function DeviceAccordion({
+  title,
+  devices,
+}: {
+  title: string
+  devices: DeviceSummary[]
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const content = useRef<HTMLDivElement>(null)
+  const chevron = useRef<HTMLSpanElement>(null)
+
+  useGSAP(
+    () => {
+      if (!content.current || !chevron.current) return
+
+      gsap.to(content.current, {
+        height: isOpen ? 'auto' : 0,
+        duration: 0.24,
+        ease: 'power2.out',
+      })
+      gsap.to(chevron.current, {
+        rotate: isOpen ? 90 : 0,
+        duration: 0.24,
+        ease: 'power2.out',
+      })
+    },
+    { dependencies: [isOpen] },
+  )
+
+  return (
+    <section className="figdev__device-group">
+      <button
+        className="figdev__device-group-toggle"
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span>{title}</span>
+        <span className="figdev__device-group-chevron" ref={chevron}>-&gt;</span>
+      </button>
+      <div className="figdev__device-group-content" ref={content}>
+        <div className="figdev__device-list">
+          {devices.map((device) => (
+            <div className="figdev__device" key={device.id}>
+              <strong>{device.name}</strong>
+              <small>{formatPortSummary(device)}</small>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const container = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [catalog, setCatalog] = useState<DeviceCatalog | null>(null)
+  const [catalogError, setCatalogError] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/devices')
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load device catalog')
+        return response.json() as Promise<DeviceCatalog>
+      })
+      .then(setCatalog)
+      .catch(() => setCatalogError(true))
+  }, [])
 
   useGSAP(
     () => {
@@ -38,6 +120,20 @@ function App() {
             Studio
           </a>
         </nav>
+        <div className="figdev__device-browser" aria-label="Available stage devices">
+          <p className="figdev__sidebar-label">Stage devices</p>
+          {catalog ? (
+            <>
+              <DeviceAccordion title="Sources" devices={catalog.sources} />
+              <DeviceAccordion title="Outputs" devices={catalog.outputs} />
+              <DeviceAccordion title="Process devices" devices={catalog.processors} />
+            </>
+          ) : (
+            <p className="figdev__device-browser-status">
+              {catalogError ? 'Catalog unavailable' : 'Loading catalog...'}
+            </p>
+          )}
+        </div>
         <p className="figdev__sidebar-footer">Build 0.1 / browser audio lab</p>
       </aside>
 

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { buildDeviceCatalog } from './simulation/application/catalog/DeviceCatalog'
 
 const app = new Hono()
 
@@ -19,5 +20,7 @@ app.get('/', (c) =>
 )
 
 app.get('/health', (c) => c.json({ ok: true }))
+
+app.get('/api/devices', (c) => c.json(buildDeviceCatalog()))
 
 export default app

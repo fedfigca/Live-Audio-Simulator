@@ -20,6 +20,7 @@ export enum ConnectorType {
   PowerEdison = "power_edison",
   Optical = "optical",
   USB = "usb",
+  Combo = "combo",
   Custom = "custom"
 }
 
@@ -80,6 +81,8 @@ export interface Port {
   signalValue?: number;             // current level in dB (runtime)
   impedance?: Impedance;
   requiresPhantomPower?: boolean;
+  providesPhantomPower?: boolean;
+  acceptedConnectors?: ConnectorType[];
   connectedTo?: PortReference | null;
   state: ConnectionState;
 }

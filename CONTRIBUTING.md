@@ -48,8 +48,11 @@ Use React's current patterns and keep animation lifecycle management inside Reac
 - Add future stage elements under `src/simulation/domain/stage/entities/` and domain values under `src/simulation/domain/stage/value-objects/`.
 - Add instrument sources under `src/simulation/domain/stage/entities/sources/instruments/` and microphone sources under `src/simulation/domain/stage/entities/sources/microphones/`; export them from the sources barrel.
 - Add playback sources under `src/simulation/domain/stage/entities/sources/players/`; keep future stereo-file playback behavior inside `AudioPlayer` rather than the UI.
+- Add system output devices under `src/simulation/domain/stage/entities/outputs/` and signal processors under `src/simulation/domain/stage/entities/processors/`; export them from their matching barrel files.
+- Model speaker or headphone jacks as physical input ports even though the device is an audio-system output and uses `DeviceRole.Sink`.
 - Keep the domain layer independent of React, Hono, Vite, and browser APIs.
 - Put orchestration and use cases in `src/simulation/application/`; put persistence and external integrations in `src/simulation/infrastructure/`.
+- Register every available device in `src/simulation/application/catalog/DeviceCatalog.ts`; the Hono `GET /api/devices` route sends frontend-safe summaries to the React sidebar.
 - Do not invent or duplicate the master object API before its source implementation is provided.
 
 ## Class naming

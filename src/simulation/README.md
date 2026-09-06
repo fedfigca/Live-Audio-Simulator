@@ -16,6 +16,8 @@ simulation/
           instruments/          # Guitar, keyboard, and future instrument sources
           microphones/          # Dynamic, condenser, and future microphone sources
           players/              # Audio playback sources
+        outputs/                 # Speakers, headphones, and future system outputs
+        processors/              # Mixers, EQs, and future signal processors
       value-objects/            # Immutable domain values such as dimensions, positions, and channels
     shared/                     # Domain primitives shared by multiple stage areas
   application/
@@ -78,6 +80,25 @@ The first source objects are available from `domain/stage/entities/sources/index
 - `DynamicMicrophone`: one mono XLR output, microphone level, low impedance.
 - `CondenserMicrophone`: the dynamic microphone output contract plus `requiresPhantomPower: true`.
 
+## Output and processor devices
+
+The domain distinguishes a device's role in the audio system from the direction of its physical jacks:
+
+- `OutputDevice` represents a system output such as a speaker. It is a `DeviceRole.Sink` and contains input ports because audio physically enters the speaker.
+- `ProcessorDevice` represents a device that receives and transforms or routes audio. It can contain both inputs and outputs and defaults to `DeviceRole.Processor`.
+- A class may override the processor role when the model has a more specific role, as `Mixer` does with `DeviceRole.Mixer`.
+
+The current output devices are:
+
+- `Subwoofer18`: one input-only combo port accepting XLR or TRS, line level, high impedance.
+- `ActiveSpeaker15`: one input-only combo port accepting XLR or TRS, line level, high impedance.
+
+The current processor is:
+
+- `Mixer`: eight XLR microphone-level inputs, each marked `providesPhantomPower: true`; two XLR main outputs and four XLR aux outputs, all line level and low impedance.
+
+`ConnectorType.Combo` identifies the physical combo jack, while `acceptedConnectors` records the plugs it accepts. This keeps the physical jack distinct from the compatible connector types.
+
 The source hierarchy is:
 
 ```text
@@ -131,3 +152,15 @@ export class ExampleInstrument extends AudioSource {
 For multiple mono outputs, call `addAudioOutput()` once per physical output and give each port a meaningful name, as `Keyboard` does for `Left Output` and `Right Output`. For a special requirement such as phantom power, use the full port object instead of `configureOutput()` and add the relevant metadata.
 
 Finally, export the class from `domain/stage/entities/sources/index.ts`. Do not duplicate domain logic in React components or Hono route handlers.
+
+For output devices, extend `OutputDevice` and add physical inputs with `addAudioInput()`. For processors, extend `ProcessorDevice`, add inputs and outputs as required, and implement the routing or transformation in `processSignal()`. Export new classes from the matching `outputs/index.ts` or `processors/index.ts` barrel.
+
+## Frontend device catalog
+
+The backend routine in `application/catalog/DeviceCatalog.ts` instantiates every currently available source, output device, and processor, then converts them to frontend-safe summaries. Hono exposes those summaries at `GET /api/devices`.
+
+The catalog deliberately sends metadata rather than live class instances. Each device summary contains its `id`, display `name`, concrete `category`, and a flattened list of port summaries. The React sidebar uses this route to render the Sources, Outputs, and Process devices accordions.
+
+Port summaries with identical characteristics are grouped before they reach the frontend. Numbered runs are compressed into ranges such as `Input 1 to 8` and `Aux 1 to 4`; the underlying domain device still retains every individual port.
+
+When adding a new device, register it in `buildDeviceCatalog()` so it appears in the frontend catalog. Keep the catalog instantiation separate from the React UI and keep device behavior in the domain classes.
