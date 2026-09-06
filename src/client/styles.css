@@ -500,11 +500,15 @@ button {
   border: 3px solid var(--figdev-color-ink);
   border-radius: 0.55rem;
   box-shadow: 0.65rem 0.65rem 0 var(--figdev-dark-base), 0 1.5rem 3rem var(--figdev-color-accent-soft);
-  cursor: pointer;
+  cursor: grab;
   height: 15rem;
   position: relative;
   transform-origin: center bottom;
   width: min(30rem, 72%);
+}
+
+.figdev__boombox:active {
+  cursor: grabbing;
 }
 
 .figdev__boombox:hover {
@@ -825,23 +829,42 @@ button {
 }
 
 .figdev__placed-device-delete,
+.figdev__placed-device-info,
 .figdev__placed-device-resize {
   position: absolute;
   z-index: 3;
 }
 
+.figdev__placed-device-info,
 .figdev__placed-device-delete {
   background: var(--figdev-dark-base);
   border: 1px solid var(--accent);
   color: var(--accent);
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  height: 1.25rem;
-  line-height: 1;
+  align-items: center;
+  display: flex;
+  height: 1.5rem;
+  justify-content: center;
   padding: 0;
+  top: -0.7rem;
+  width: 1.5rem;
+}
+
+.figdev__placed-device-info {
+  border-radius: 50%;
+  right: 1.15rem;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.figdev__placed-device-info:hover,
+.figdev__placed-device-info:focus-visible {
+  background: var(--accent);
+  color: var(--figdev-dark-base);
+  outline: none;
+  transform: scale(1.12);
+}
+
+.figdev__placed-device-delete {
   right: -0.6rem;
-  top: -0.6rem;
-  width: 1.25rem;
 }
 
 .figdev__placed-device-resize {

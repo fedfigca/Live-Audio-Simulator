@@ -1,5 +1,6 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
+import { Info, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
 
@@ -163,8 +164,8 @@ function SessionModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function Boombox({ onClick }: { onClick: () => void }) {
-  const boombox = useRef<HTMLButtonElement>(null)
+function Boombox() {
+  const boombox = useRef<HTMLDivElement>(null)
 
   useGSAP(() => {
     if (!boombox.current) return
@@ -179,22 +180,20 @@ function Boombox({ onClick }: { onClick: () => void }) {
   }, [])
 
   return (
-    <button className="figdev__boombox" ref={boombox} type="button" onClick={onClick} aria-label="Open Audio Player details">
+    <div className="figdev__boombox" ref={boombox}>
       <span className="figdev__boombox-handle" />
       <span className="figdev__boombox-display">STEREO / FM</span>
       <span className="figdev__boombox-speaker figdev__boombox-speaker--left"><i /></span>
       <span className="figdev__boombox-speaker figdev__boombox-speaker--right"><i /></span>
       <span className="figdev__boombox-deck"><i /><i /><i /></span>
-    </button>
+    </div>
   )
 }
 
 function GenericDeviceGraphic({
   device,
-  onClick,
 }: {
   device: DeviceSummary
-  onClick: () => void
 }) {
   const physicalPorts = device.physicalPorts ?? device.ports
   const inputs = physicalPorts.filter((port) => port.direction === 'input')
@@ -210,7 +209,7 @@ function GenericDeviceGraphic({
   )
 
   return (
-    <button className="figdev__generic-device" type="button" onClick={onClick} aria-label={`Open ${device.name} details`}>
+    <div className="figdev__generic-device">
       <span className="figdev__generic-device-category">{device.category}</span>
       <strong>{device.name}</strong>
       <span className="figdev__generic-device-body">
@@ -226,7 +225,7 @@ function GenericDeviceGraphic({
         </span>}
       </span>
       <small>{device.ports.length} physical port{device.ports.length === 1 ? '' : 's'}</small>
-    </button>
+    </div>
   )
 }
 
@@ -248,7 +247,7 @@ function PlacedDeviceGraphic({
   const resizeOrigin = useRef<{ pointerX: number; pointerY: number; width: number; height: number } | null>(null)
 
   const beginMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('.figdev__placed-device-delete, .figdev__placed-device-resize')) return
+    if ((event.target as HTMLElement).closest('.figdev__placed-device-info, .figdev__placed-device-delete, .figdev__placed-device-resize')) return
     dragOrigin.current = { pointerX: event.clientX, pointerY: event.clientY, x: placedDevice.x, y: placedDevice.y }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -295,8 +294,13 @@ function PlacedDeviceGraphic({
       onPointerUp={endMove}
       onPointerCancel={endMove}
     >
-      {placedDevice.name === 'Audio Player' ? <Boombox onClick={() => onDetails(placedDevice)} /> : <GenericDeviceGraphic device={placedDevice} onClick={() => onDetails(placedDevice)} />}
-      <button className="figdev__placed-device-delete" type="button" onClick={() => onDelete(placedDevice.instanceId)} aria-label={`Remove ${placedDevice.name}`}>x</button>
+      {placedDevice.name === 'Audio Player' ? <Boombox /> : <GenericDeviceGraphic device={placedDevice} />}
+      <button className="figdev__placed-device-info" type="button" onClick={() => onDetails(placedDevice)} aria-label={`Open ${placedDevice.name} details`} title="Device info">
+        <Info size={14} strokeWidth={2.25} />
+      </button>
+      <button className="figdev__placed-device-delete" type="button" onClick={() => onDelete(placedDevice.instanceId)} aria-label={`Remove ${placedDevice.name}`} title="Remove device">
+        <Trash2 size={13} strokeWidth={2.25} />
+      </button>
       <button className="figdev__placed-device-resize" type="button" onPointerDown={beginResize} onPointerMove={resize} onPointerUp={() => { resizeOrigin.current = null }} aria-label={`Resize ${placedDevice.name}`} />
     </div>
   )
@@ -551,11 +555,7 @@ function App() {
         <header className="figdev__topbar figdev__reveal">
           <div>
             <p className="figdev__eyebrow">Stage layout / 01</p>
-            <h1>Build the rig.</h1>
-          </div>
-          <div className="figdev__connection-status">
-            <span className="figdev__status-dot" />
-            <span>Local session</span>
+            <h1>Build the stage.</h1>
           </div>
         </header>
 
