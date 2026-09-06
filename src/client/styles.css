@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-  --figdev-base-color: #232c22;
+  --figdev-base-color: #1A2B3C;
   --figdev-dark-base: #111411;
   --figdev-color-background: var(--figdev-dark-base);
   --figdev-color-surface: color-mix(

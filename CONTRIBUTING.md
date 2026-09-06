@@ -8,6 +8,8 @@ Live Audio Simulator is an SPA with a Hono backend and a React frontend.
 - `src/client/main.tsx` mounts the React application.
 - `src/client/App.tsx` contains the initial studio interface.
 - `src/client/styles.css` contains the frontend styles and theme tokens.
+- `src/simulation/` contains the framework-independent object-oriented stage simulation.
+- `src/simulation/domain/stage/Stage.ts` is the canonical home for the master stage object.
 - Development uses `@hono/vite-dev-server` and loads the React entry from `/src/client/main.tsx`.
 - Production builds the Hono Node server and then emits the React client to `dist/static/client.js`.
 
@@ -38,6 +40,17 @@ Use React's current patterns and keep animation lifecycle management inside Reac
 - Rely on `useGSAP` cleanup to revert GSAP contexts when components unmount or update.
 - Keep GSAP selectors aligned with the `figdev__` class namespace.
 - Keep client-side behavior in the React app; use Hono for backend routes and the document shell.
+
+## Simulation domain
+
+- Keep simulation rules and stage state in `src/simulation/domain/`; do not place domain logic in React components or Hono route handlers.
+- The master stage object belongs in `src/simulation/domain/stage/Stage.ts`.
+- Add future stage elements under `src/simulation/domain/stage/entities/` and domain values under `src/simulation/domain/stage/value-objects/`.
+- Add instrument sources under `src/simulation/domain/stage/entities/sources/instruments/` and microphone sources under `src/simulation/domain/stage/entities/sources/microphones/`; export them from the sources barrel.
+- Add playback sources under `src/simulation/domain/stage/entities/sources/players/`; keep future stereo-file playback behavior inside `AudioPlayer` rather than the UI.
+- Keep the domain layer independent of React, Hono, Vite, and browser APIs.
+- Put orchestration and use cases in `src/simulation/application/`; put persistence and external integrations in `src/simulation/infrastructure/`.
+- Do not invent or duplicate the master object API before its source implementation is provided.
 
 ## Class naming
 

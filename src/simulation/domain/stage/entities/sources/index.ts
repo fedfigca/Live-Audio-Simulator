@@ -1,0 +1,6 @@
+export { AudioSource } from './AudioSource'
+export { Guitar } from './instruments/Guitar'
+export { Keyboard } from './instruments/Keyboard'
+export { AudioPlayer } from './players/AudioPlayer'
+export { DynamicMicrophone } from './microphones/Dynamic'
+export { CondenserMicrophone } from './microphones/Condenser'

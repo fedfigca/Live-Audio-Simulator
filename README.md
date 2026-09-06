@@ -28,6 +28,7 @@ The detailed contributor guide is in [CONTRIBUTING.md](CONTRIBUTING.md). It cove
 
 - Hono is the backend and owns the HTML shell in `src/index.ts`.
 - React is the frontend SPA. The development client starts at `src/client/main.tsx` and the production client is emitted as `dist/static/client.js`.
+- The object-oriented stage simulation lives in `src/simulation/`; its master object belongs in `src/simulation/domain/stage/Stage.ts`.
 - Keep the Hono root response as HTML so `@hono/vite-dev-server` can inject its browser reload client.
 - `npm run build` builds the Hono Node server first, then the React client with `vite build --mode client`.
 
