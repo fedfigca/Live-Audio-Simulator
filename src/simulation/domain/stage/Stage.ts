@@ -77,9 +77,9 @@ export interface Port {
   direction: PortDirection;
   maxChannels?: number;            // 1 = mono, 2 = stereo, etc.
   isPowered?: boolean;             // phantom power, etc.
-  signalLevel?: SignalLevel;
+  signalLevel?: SignalLevel[] | SignalLevel; // can accept multiple levels
   signalValue?: number;             // current level in dB (runtime)
-  impedance?: Impedance;
+  impedance?: Impedance[] | Impedance;
   requiresPhantomPower?: boolean;
   providesPhantomPower?: boolean;
   acceptedConnectors?: ConnectorType[];

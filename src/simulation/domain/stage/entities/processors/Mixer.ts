@@ -19,10 +19,11 @@ export class Mixer extends ProcessorDevice {
     for (let channel = 1; channel <= 8; channel += 1) {
       this.addAudioInput({
         name: `Input ${channel}`,
-        connector: ConnectorType.XLR,
+        connector: ConnectorType.Combo,
+        acceptedConnectors: [ConnectorType.XLR, ConnectorType.TRS],        
         direction: PortDirection.Input,
         maxChannels: 1,
-        signalLevel: SignalLevel.Microphone,
+        signalLevel: [SignalLevel.Microphone, SignalLevel.Line, SignalLevel.Instrument],
         impedance: Impedance.High,
         providesPhantomPower: true,
       })

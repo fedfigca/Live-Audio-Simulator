@@ -17,11 +17,11 @@ const analogConnectors = new Set([
 export interface AudioPortLike {
   id: string
   deviceId?: string
-  connector: ConnectorType | string
-  acceptedConnectors?: Array<ConnectorType | string>
-  direction: PortDirection | string
+  connector: ConnectorType
+  acceptedConnectors?: Array<ConnectorType>
+  direction: PortDirection
   signalLevel?: string
-  state?: ConnectionState | string
+  state?: ConnectionState
 }
 
 function canReceive(port: AudioPortLike, source: AudioPortLike): boolean {
@@ -30,11 +30,7 @@ function canReceive(port: AudioPortLike, source: AudioPortLike): boolean {
     return false
   }
 
-  if (!port.acceptedConnectors?.length && port.connector !== source.connector) {
-    return false
-  }
-
-  return !port.signalLevel || !source.signalLevel || port.signalLevel === source.signalLevel
+  return !port.signalLevel || !source.signalLevel || port.signalLevel.includes(source.signalLevel)
 }
 
 function isSourcePort(port: AudioPortLike, other: AudioPortLike): boolean {
