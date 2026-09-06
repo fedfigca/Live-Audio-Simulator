@@ -50,6 +50,16 @@
     var(--figdev-base-color) 60%,
     var(--figdev-dark-base)
   );
+  --figdev-color-icon: color-mix(
+    in oklab,
+    var(--figdev-color-accent) 68%,
+    var(--figdev-color-ink)
+  );
+  --figdev-label-background: color-mix(
+    in srgb,
+    var(--figdev-dark-base) 78%,
+    transparent
+  );
   --ink: var(--figdev-color-ink);
   --muted: var(--figdev-color-muted);
   --line: var(--figdev-color-line);
@@ -495,111 +505,6 @@ button {
   font-size: 0.62rem;
 }
 
-.figdev__boombox {
-  background: var(--figdev-color-surface-raised);
-  border: 3px solid var(--figdev-color-ink);
-  border-radius: 0.55rem;
-  box-shadow: 0.65rem 0.65rem 0 var(--figdev-dark-base), 0 1.5rem 3rem var(--figdev-color-accent-soft);
-  cursor: grab;
-  height: 15rem;
-  position: relative;
-  transform-origin: center bottom;
-  width: min(30rem, 72%);
-}
-
-.figdev__boombox:active {
-  cursor: grabbing;
-}
-
-.figdev__boombox:hover {
-  border-color: var(--accent);
-}
-
-.figdev__boombox-handle {
-  border: 3px solid var(--figdev-color-ink);
-  border-bottom: 0;
-  height: 2.2rem;
-  left: 25%;
-  position: absolute;
-  top: -2.4rem;
-  width: 50%;
-}
-
-.figdev__boombox-display {
-  background: var(--figdev-dark-base);
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: clamp(0.42rem, 2.2cqw, 0.64rem);
-  letter-spacing: 0.15em;
-  max-width: 48%;
-  overflow: hidden;
-  padding: clamp(0.25rem, 2cqw, 0.45rem);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  position: absolute;
-  right: 1.2rem;
-  top: 1.2rem;
-}
-
-.figdev__boombox-speaker {
-  align-items: center;
-  background: var(--figdev-dark-base);
-  border: 2px solid var(--figdev-color-ink);
-  border-radius: 50%;
-  display: flex;
-  height: 6rem;
-  justify-content: center;
-  position: absolute;
-  top: 4.2rem;
-  width: 6rem;
-}
-
-.figdev__boombox-speaker::before,
-.figdev__boombox-speaker::after,
-.figdev__boombox-speaker i {
-  border: 1px solid var(--figdev-color-waveform);
-  border-radius: 50%;
-  content: '';
-  height: 78%;
-  position: absolute;
-  width: 78%;
-}
-
-.figdev__boombox-speaker::after {
-  height: 52%;
-  width: 52%;
-}
-
-.figdev__boombox-speaker i {
-  background: var(--figdev-color-waveform);
-  height: 20%;
-  width: 20%;
-}
-
-.figdev__boombox-speaker--left {
-  left: 1.5rem;
-}
-
-.figdev__boombox-speaker--right {
-  right: 1.5rem;
-}
-
-.figdev__boombox-deck {
-  bottom: 1.3rem;
-  display: flex;
-  gap: 0.4rem;
-  left: 50%;
-  position: absolute;
-  transform: translateX(-50%);
-}
-
-.figdev__boombox-deck i {
-  background: var(--accent);
-  display: block;
-  height: 0.35rem;
-  width: 1.5rem;
-}
-
 .figdev__placed-device {
   container-name: figdev-device;
   container-type: size;
@@ -610,7 +515,6 @@ button {
   z-index: 2;
 }
 
-.figdev__placed-device > .figdev__boombox,
 .figdev__placed-device > .figdev__generic-device {
   height: 100%;
   width: 100%;
@@ -619,7 +523,9 @@ button {
 .figdev__generic-device {
   align-items: center;
   background: var(--figdev-color-surface-raised);
-  border: 1px solid var(--figdev-color-ink);
+  border: 3px solid var(--figdev-color-icon);
+  border-radius: 0.55rem;
+  box-shadow: 0.45rem 0.45rem 0 var(--figdev-dark-base);
   color: var(--ink);
   cursor: grab;
   display: flex;
@@ -637,7 +543,8 @@ button {
 }
 
 .figdev__generic-device:hover {
-  border-color: var(--accent);
+  border-color: var(--figdev-color-ink);
+  box-shadow: 0.45rem 0.45rem 0 var(--figdev-color-accent-soft);
 }
 
 .figdev__generic-device-category {
@@ -656,6 +563,27 @@ button {
   max-width: 100%;
   overflow-wrap: anywhere;
   text-wrap: balance;
+}
+
+.figdev__generic-device-name,
+.figdev__generic-device-category,
+.figdev__generic-device small {
+  background: var(--figdev-label-background);
+  border-radius: 0.2rem;
+  padding: 0.15rem 0.3rem;
+  position: relative;
+  z-index: 1;
+}
+
+.figdev__device-icon {
+  color: var(--figdev-color-icon);
+  height: clamp(2rem, 18cqw, 5rem);
+  max-height: 42%;
+  max-width: 42%;
+  min-height: 1.75rem;
+  min-width: 1.75rem;
+  stroke: currentColor;
+  width: clamp(2rem, 18cqw, 5rem);
 }
 
 .figdev__generic-device small {
@@ -868,11 +796,14 @@ button {
 }
 
 .figdev__placed-device-resize {
+  align-items: center;
   background: var(--accent);
   border: 2px solid var(--figdev-dark-base);
   bottom: -0.35rem;
   cursor: nwse-resize;
+  display: flex;
   height: 0.8rem;
+  justify-content: center;
   padding: 0;
   right: -0.35rem;
   width: 0.8rem;
@@ -911,11 +842,13 @@ button {
 }
 
 .figdev__modal-close {
+  align-items: center;
   background: none;
   border: 0;
   color: var(--muted);
-  font-family: var(--mono);
-  font-size: 1rem;
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem;
 }
 
 .figdev__modal-close:hover {
@@ -1330,25 +1263,6 @@ h2 {
 
   .figdev__stage-surface::before {
     inset: 1rem;
-  }
-
-  .figdev__boombox {
-    height: 11rem;
-    width: min(23rem, 78%);
-  }
-
-  .figdev__boombox-speaker {
-    height: 4.5rem;
-    top: 3.2rem;
-    width: 4.5rem;
-  }
-
-  .figdev__boombox-speaker--left {
-    left: 1rem;
-  }
-
-  .figdev__boombox-speaker--right {
-    right: 1rem;
   }
 
   .figdev__topbar {

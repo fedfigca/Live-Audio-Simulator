@@ -1,7 +1,20 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { Info, Trash2 } from 'lucide-react'
+import {
+  AudioWaveform,
+  BoomBox,
+  Guitar,
+  Info,
+  KeyboardMusic,
+  Maximize2,
+  MicVocal,
+  SlidersHorizontal,
+  Speaker,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
 
 const tracks = [
@@ -95,7 +108,9 @@ function DeviceDetailsModal({
             <p className="figdev__eyebrow">Device specification</p>
             <h2 id="device-modal-title">{device.name}</h2>
           </div>
-          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close device details">x</button>
+          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close device details" title="Close">
+            <X size={16} strokeWidth={2} />
+          </button>
         </div>
         <div className="figdev__modal-ports">
           {device.ports.map((port) => (
@@ -133,7 +148,9 @@ function SessionModal({ onClose }: { onClose: () => void }) {
             <p className="figdev__eyebrow">Current elements</p>
             <h2 id="session-modal-title">Audio Player session</h2>
           </div>
-          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close session details">x</button>
+          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close session details" title="Close">
+            <X size={16} strokeWidth={2} />
+          </button>
         </div>
         <div className="figdev__session-visualizer">
           {Array.from({ length: 48 }, (_, index) => (
@@ -164,30 +181,20 @@ function SessionModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function Boombox() {
-  const boombox = useRef<HTMLDivElement>(null)
+function getDeviceIcon(device: DeviceSummary): LucideIcon {
+  if (device.name === 'Audio Player') return BoomBox
+  if (device.name === 'Guitar') return Guitar
+  if (device.name === 'Keyboard') return KeyboardMusic
+  if (device.name.includes('Microphone')) return MicVocal
+  if (device.name.includes('Speaker') || device.name.includes('Subwoofer')) return Speaker
+  if (device.name === 'Mixer') return SlidersHorizontal
+  return AudioWaveform
+}
 
-  useGSAP(() => {
-    if (!boombox.current) return
+function DeviceIconCard({ device }: { device: DeviceSummary }) {
+  const Icon = getDeviceIcon(device)
 
-    gsap.fromTo(boombox.current, { opacity: 0, scale: 0.94, y: 10 }, {
-      opacity: 1,
-      scale: 1,
-      y: 0,
-      duration: 0.45,
-      ease: 'back.out(1.4)',
-    })
-  }, [])
-
-  return (
-    <div className="figdev__boombox" ref={boombox}>
-      <span className="figdev__boombox-handle" />
-      <span className="figdev__boombox-display">STEREO / FM</span>
-      <span className="figdev__boombox-speaker figdev__boombox-speaker--left"><i /></span>
-      <span className="figdev__boombox-speaker figdev__boombox-speaker--right"><i /></span>
-      <span className="figdev__boombox-deck"><i /><i /><i /></span>
-    </div>
-  )
+  return <Icon className="figdev__device-icon" aria-hidden="true" strokeWidth={1.5} />
 }
 
 function GenericDeviceGraphic({
@@ -211,12 +218,12 @@ function GenericDeviceGraphic({
   return (
     <div className="figdev__generic-device">
       <span className="figdev__generic-device-category">{device.category}</span>
-      <strong>{device.name}</strong>
+      <DeviceIconCard device={device} />
+      <strong className="figdev__generic-device-name">{device.name}</strong>
       <span className="figdev__generic-device-body">
         {inputs.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--inputs">
           {inputs.map((port) => renderPort(port, 'input'))}
         </span>}
-        <span className="figdev__generic-device-mark">FIGDEV</span>
         {bidirectional.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--bidirectional">
           {bidirectional.map((port) => renderPort(port, 'bidirectional'))}
         </span>}
@@ -224,7 +231,7 @@ function GenericDeviceGraphic({
           {outputs.map((port) => renderPort(port, 'output'))}
         </span>}
       </span>
-      <small>{device.ports.length} physical port{device.ports.length === 1 ? '' : 's'}</small>
+      <small>{physicalPorts.length} physical port{physicalPorts.length === 1 ? '' : 's'}</small>
     </div>
   )
 }
@@ -294,14 +301,16 @@ function PlacedDeviceGraphic({
       onPointerUp={endMove}
       onPointerCancel={endMove}
     >
-      {placedDevice.name === 'Audio Player' ? <Boombox /> : <GenericDeviceGraphic device={placedDevice} />}
+      <GenericDeviceGraphic device={placedDevice} />
       <button className="figdev__placed-device-info" type="button" onClick={() => onDetails(placedDevice)} aria-label={`Open ${placedDevice.name} details`} title="Device info">
         <Info size={14} strokeWidth={2.25} />
       </button>
       <button className="figdev__placed-device-delete" type="button" onClick={() => onDelete(placedDevice.instanceId)} aria-label={`Remove ${placedDevice.name}`} title="Remove device">
         <Trash2 size={13} strokeWidth={2.25} />
       </button>
-      <button className="figdev__placed-device-resize" type="button" onPointerDown={beginResize} onPointerMove={resize} onPointerUp={() => { resizeOrigin.current = null }} aria-label={`Resize ${placedDevice.name}`} />
+      <button className="figdev__placed-device-resize" type="button" onPointerDown={beginResize} onPointerMove={resize} onPointerUp={() => { resizeOrigin.current = null }} aria-label={`Resize ${placedDevice.name}`} title="Resize device">
+        <Maximize2 size={11} strokeWidth={2.5} />
+      </button>
     </div>
   )
 }
