@@ -15,6 +15,26 @@ const COLOR_PRESETS = [
   { name: 'Moss Boss', value: '#232C22' },
 ]
 
+type PlacedDevice = DeviceSummary & {
+  instanceId: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function getDefaultDeviceSize(device: DeviceSummary): { width: number; height: number } {
+  if (device.name === 'Mixer') {
+    return { width: 38, height: 46 }
+  }
+
+  if (device.name === 'Audio Player') {
+    return { width: 34, height: 32 }
+  }
+
+  return { width: 28, height: 28 }
+}
+
 function formatPortSummary(device: DeviceSummary): string {
   return device.ports
     .map((port) => {
@@ -30,12 +50,268 @@ function formatPortSummary(device: DeviceSummary): string {
     .join(' · ')
 }
 
+function formatPortDetails(port: DeviceSummary['physicalPorts'][number]): string {
+  const acceptedConnectors = port.acceptedConnectors?.length
+    ? ` accepts ${port.acceptedConnectors.map((connector) => connector.toUpperCase()).join(' / ')}`
+    : ''
+  const signal = port.signalLevel ? `, ${port.signalLevel} level` : ''
+  const impedance = port.impedance ? `, ${port.impedance} impedance` : ''
+  const phantom = port.providesPhantomPower ? ', phantom capable' : port.requiresPhantomPower ? ', requires phantom' : ''
+
+  return `${port.name}: ${port.connector.toUpperCase()}${acceptedConnectors}${signal}${impedance}${phantom}`
+}
+
+function DeviceDetailsModal({
+  device,
+  onClose,
+}: {
+  device: DeviceSummary | null
+  onClose: () => void
+}) {
+  const modal = useRef<HTMLDivElement>(null)
+
+  useGSAP(
+    () => {
+      if (!device || !modal.current) return
+
+      gsap.fromTo(modal.current, { opacity: 0, y: 12 }, {
+        opacity: 1,
+        y: 0,
+        duration: 0.25,
+        ease: 'power2.out',
+      })
+    },
+    { dependencies: [device] },
+  )
+
+  if (!device) return null
+
+  return (
+    <div className="figdev__modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="figdev__modal" ref={modal} role="dialog" aria-modal="true" aria-labelledby="device-modal-title" onClick={(event) => event.stopPropagation()}>
+        <div className="figdev__modal-heading">
+          <div>
+            <p className="figdev__eyebrow">Device specification</p>
+            <h2 id="device-modal-title">{device.name}</h2>
+          </div>
+          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close device details">x</button>
+        </div>
+        <div className="figdev__modal-ports">
+          {device.ports.map((port) => (
+            <div className="figdev__modal-port" key={port.name}>
+              <strong>{port.name}</strong>
+              <small>{formatPortSummary({ ...device, ports: [port] })}</small>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SessionModal({ onClose }: { onClose: () => void }) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const modal = useRef<HTMLDivElement>(null)
+
+  useGSAP(() => {
+    if (!modal.current) return
+
+    gsap.fromTo(modal.current, { opacity: 0, y: 12 }, {
+      opacity: 1,
+      y: 0,
+      duration: 0.25,
+      ease: 'power2.out',
+    })
+  }, [])
+
+  return (
+    <div className="figdev__modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="figdev__modal figdev__session-modal" ref={modal} role="dialog" aria-modal="true" aria-labelledby="session-modal-title" onClick={(event) => event.stopPropagation()}>
+        <div className="figdev__modal-heading">
+          <div>
+            <p className="figdev__eyebrow">Current elements</p>
+            <h2 id="session-modal-title">Audio Player session</h2>
+          </div>
+          <button className="figdev__modal-close" type="button" onClick={onClose} aria-label="Close session details">x</button>
+        </div>
+        <div className="figdev__session-visualizer">
+          {Array.from({ length: 48 }, (_, index) => (
+            <span key={index} style={{ '--bar-height': `${24 + ((index * 17) % 66)}%` } as React.CSSProperties} />
+          ))}
+        </div>
+        <div className="figdev__transport">
+          <button className="figdev__transport-button" type="button" aria-label="Previous track">|&lt;</button>
+          <button className="figdev__transport-button figdev__transport-button--primary" type="button" onClick={() => setIsPlaying((playing) => !playing)} aria-label={isPlaying ? 'Pause' : 'Play'}>
+            {isPlaying ? '||' : '>'}
+          </button>
+          <button className="figdev__transport-button" type="button" aria-label="Next track">&gt;|</button>
+          <div className="figdev__transport-progress"><span /></div>
+          <span className="figdev__transport-volume">VOL 72%</span>
+        </div>
+        <div className="figdev__modal-library">
+          <p className="figdev__eyebrow">Source material</p>
+          {tracks.map((track, index) => (
+            <div className={`figdev__modal-track ${index === 0 ? 'figdev__modal-track--active' : ''}`} key={track.name}>
+              <span>0{index + 1}</span>
+              <strong>{track.name}<small>{track.artist}</small></strong>
+              <span>{track.duration}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function Boombox({ onClick }: { onClick: () => void }) {
+  const boombox = useRef<HTMLButtonElement>(null)
+
+  useGSAP(() => {
+    if (!boombox.current) return
+
+    gsap.fromTo(boombox.current, { opacity: 0, scale: 0.94, y: 10 }, {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      duration: 0.45,
+      ease: 'back.out(1.4)',
+    })
+  }, [])
+
+  return (
+    <button className="figdev__boombox" ref={boombox} type="button" onClick={onClick} aria-label="Open Audio Player details">
+      <span className="figdev__boombox-handle" />
+      <span className="figdev__boombox-display">STEREO / FM</span>
+      <span className="figdev__boombox-speaker figdev__boombox-speaker--left"><i /></span>
+      <span className="figdev__boombox-speaker figdev__boombox-speaker--right"><i /></span>
+      <span className="figdev__boombox-deck"><i /><i /><i /></span>
+    </button>
+  )
+}
+
+function GenericDeviceGraphic({
+  device,
+  onClick,
+}: {
+  device: DeviceSummary
+  onClick: () => void
+}) {
+  const physicalPorts = device.physicalPorts ?? device.ports
+  const inputs = physicalPorts.filter((port) => port.direction === 'input')
+  const outputs = physicalPorts.filter((port) => port.direction === 'output')
+  const bidirectional = physicalPorts.filter((port) => port.direction === 'bidirectional')
+
+  const renderPort = (port: typeof physicalPorts[number], type: 'input' | 'output' | 'bidirectional') => (
+    <span className={`figdev__port-wrap figdev__port-wrap--${type}`} key={`${type}-${port.name}`}>
+      <i className={`figdev__port figdev__port--${type}`} aria-label={formatPortDetails(port)} />
+      <span className="figdev__port-label">{port.name.replace(/^(Input|Output|Aux) /, '')}</span>
+      <span className="figdev__port-tooltip" role="tooltip">{formatPortDetails(port)}</span>
+    </span>
+  )
+
+  return (
+    <button className="figdev__generic-device" type="button" onClick={onClick} aria-label={`Open ${device.name} details`}>
+      <span className="figdev__generic-device-category">{device.category}</span>
+      <strong>{device.name}</strong>
+      <span className="figdev__generic-device-body">
+        {inputs.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--inputs">
+          {inputs.map((port) => renderPort(port, 'input'))}
+        </span>}
+        <span className="figdev__generic-device-mark">FIGDEV</span>
+        {bidirectional.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--bidirectional">
+          {bidirectional.map((port) => renderPort(port, 'bidirectional'))}
+        </span>}
+        {outputs.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--outputs">
+          {outputs.map((port) => renderPort(port, 'output'))}
+        </span>}
+      </span>
+      <small>{device.ports.length} physical port{device.ports.length === 1 ? '' : 's'}</small>
+    </button>
+  )
+}
+
+function PlacedDeviceGraphic({
+  placedDevice,
+  onMove,
+  onResize,
+  onDelete,
+  onDetails,
+}: {
+  placedDevice: PlacedDevice
+  onMove: (instanceId: string, x: number, y: number) => void
+  onResize: (instanceId: string, width: number, height: number) => void
+  onDelete: (instanceId: string) => void
+  onDetails: (device: DeviceSummary) => void
+}) {
+  const item = useRef<HTMLDivElement>(null)
+  const dragOrigin = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(null)
+  const resizeOrigin = useRef<{ pointerX: number; pointerY: number; width: number; height: number } | null>(null)
+
+  const beginMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('.figdev__placed-device-delete, .figdev__placed-device-resize')) return
+    dragOrigin.current = { pointerX: event.clientX, pointerY: event.clientY, x: placedDevice.x, y: placedDevice.y }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const move = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!item.current || !dragOrigin.current) return
+    const bounds = item.current.parentElement?.getBoundingClientRect()
+    if (!bounds) return
+    onMove(
+      placedDevice.instanceId,
+      Math.max(1, Math.min(82, dragOrigin.current.x + ((event.clientX - dragOrigin.current.pointerX) / bounds.width) * 100)),
+      Math.max(8, Math.min(82, dragOrigin.current.y + ((event.clientY - dragOrigin.current.pointerY) / bounds.height) * 100)),
+    )
+  }
+
+  const endMove = () => {
+    dragOrigin.current = null
+  }
+
+  const beginResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    resizeOrigin.current = { pointerX: event.clientX, pointerY: event.clientY, width: placedDevice.width, height: placedDevice.height }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const resize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!item.current || !resizeOrigin.current) return
+    const bounds = item.current.parentElement?.getBoundingClientRect()
+    if (!bounds) return
+    onResize(
+      placedDevice.instanceId,
+      Math.max(12, Math.min(48, resizeOrigin.current.width + ((event.clientX - resizeOrigin.current.pointerX) / bounds.width) * 100)),
+      Math.max(10, Math.min(42, resizeOrigin.current.height + ((event.clientY - resizeOrigin.current.pointerY) / bounds.height) * 100)),
+    )
+  }
+
+  return (
+    <div
+      className="figdev__placed-device"
+      ref={item}
+      style={{ left: `${placedDevice.x}%`, top: `${placedDevice.y}%`, width: `${placedDevice.width}%`, height: `${placedDevice.height}%` }}
+      onPointerDown={beginMove}
+      onPointerMove={move}
+      onPointerUp={endMove}
+      onPointerCancel={endMove}
+    >
+      {placedDevice.name === 'Audio Player' ? <Boombox onClick={() => onDetails(placedDevice)} /> : <GenericDeviceGraphic device={placedDevice} onClick={() => onDetails(placedDevice)} />}
+      <button className="figdev__placed-device-delete" type="button" onClick={() => onDelete(placedDevice.instanceId)} aria-label={`Remove ${placedDevice.name}`}>x</button>
+      <button className="figdev__placed-device-resize" type="button" onPointerDown={beginResize} onPointerMove={resize} onPointerUp={() => { resizeOrigin.current = null }} aria-label={`Resize ${placedDevice.name}`} />
+    </div>
+  )
+}
+
 function DeviceAccordion({
   title,
   devices,
+  onDeviceClick,
+  onDeviceDragStart,
 }: {
   title: string
   devices: DeviceSummary[]
+  onDeviceClick: (device: DeviceSummary) => void
+  onDeviceDragStart: (device: DeviceSummary, event: React.DragEvent<HTMLButtonElement>) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const content = useRef<HTMLDivElement>(null)
@@ -73,10 +349,17 @@ function DeviceAccordion({
       <div className="figdev__device-group-content" ref={content}>
         <div className="figdev__device-list">
           {devices.map((device) => (
-            <div className="figdev__device" key={device.id}>
+            <button
+              className="figdev__device"
+              key={device.id}
+              type="button"
+              draggable
+              onClick={() => onDeviceClick(device)}
+              onDragStart={(event) => onDeviceDragStart(device, event)}
+            >
               <strong>{device.name}</strong>
               <small>{formatPortSummary(device)}</small>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -155,9 +438,12 @@ function SettingsPanel({
 
 function App() {
   const container = useRef<HTMLDivElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
   const [catalog, setCatalog] = useState<DeviceCatalog | null>(null)
   const [catalogError, setCatalogError] = useState(false)
+  const [selectedDevice, setSelectedDevice] = useState<DeviceSummary | null>(null)
+  const [isSessionOpen, setIsSessionOpen] = useState(false)
+  const [placedDevices, setPlacedDevices] = useState<PlacedDevice[]>([])
+  const [isStageDragOver, setIsStageDragOver] = useState(false)
   const [baseColor, setBaseColor] = useState(() => (
     localStorage.getItem(COLOR_STORAGE_KEY) ?? COLOR_PRESETS[0].value
   ))
@@ -190,6 +476,37 @@ function App() {
     { scope: container },
   )
 
+  const handleDeviceDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setIsStageDragOver(false)
+
+    const deviceId = event.dataTransfer.getData('application/x-figdev-device')
+    const device = [...(catalog?.sources ?? []), ...(catalog?.outputs ?? []), ...(catalog?.processors ?? [])]
+      .find((candidate) => candidate.id === deviceId)
+
+    if (!device) return
+
+    const defaultSize = getDefaultDeviceSize(device)
+
+    setPlacedDevices((current) => [
+      ...current,
+      {
+        ...device,
+        instanceId: `${device.id}-${Date.now()}`,
+        x: 8 + ((current.length * 9) % Math.max(18, 84 - defaultSize.width)),
+        y: 12 + ((current.length * 7) % Math.max(18, 76 - defaultSize.height)),
+        width: defaultSize.width,
+        height: defaultSize.height,
+      },
+    ])
+  }
+
+  const updatePlacedDevice = (instanceId: string, updates: Partial<PlacedDevice>) => {
+    setPlacedDevices((current) => current.map((device) => (
+      device.instanceId === instanceId ? { ...device, ...updates } : device
+    )))
+  }
+
   return (
     <div className="figdev__app" ref={container}>
       <aside className="figdev__sidebar figdev__reveal">
@@ -207,9 +524,18 @@ function App() {
           <p className="figdev__sidebar-label">Stage devices</p>
           {catalog ? (
             <>
-              <DeviceAccordion title="Sources" devices={catalog.sources} />
-              <DeviceAccordion title="Outputs" devices={catalog.outputs} />
-              <DeviceAccordion title="Process devices" devices={catalog.processors} />
+              <DeviceAccordion title="Sources" devices={catalog.sources} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+                event.dataTransfer.setData('application/x-figdev-device', device.id)
+                event.dataTransfer.effectAllowed = 'copy'
+              }} />
+              <DeviceAccordion title="Outputs" devices={catalog.outputs} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+                event.dataTransfer.setData('application/x-figdev-device', device.id)
+                event.dataTransfer.effectAllowed = 'copy'
+              }} />
+              <DeviceAccordion title="Process devices" devices={catalog.processors} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+                event.dataTransfer.setData('application/x-figdev-device', device.id)
+                event.dataTransfer.effectAllowed = 'copy'
+              }} />
             </>
           ) : (
             <p className="figdev__device-browser-status">
@@ -224,8 +550,8 @@ function App() {
       <main className="figdev__main" id="studio">
         <header className="figdev__topbar figdev__reveal">
           <div>
-            <p className="figdev__eyebrow">Live Audio Simulator</p>
-            <h1>Shape the signal.</h1>
+            <p className="figdev__eyebrow">Stage layout / 01</p>
+            <h1>Build the rig.</h1>
           </div>
           <div className="figdev__connection-status">
             <span className="figdev__status-dot" />
@@ -233,75 +559,45 @@ function App() {
           </div>
         </header>
 
-        <section className="figdev__studio" aria-label="Audio studio">
-          <div className="figdev__visualizer-panel figdev__reveal">
-            <div className="figdev__panel-heading">
-              <div>
-                <p className="figdev__eyebrow">Now simulating</p>
-                <h2>Late Night Transit</h2>
+        <section
+          className={`figdev__stage figdev__reveal ${isStageDragOver ? 'figdev__stage--drag-over' : ''}`}
+          aria-label="Stage layout drop zone"
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsStageDragOver(true)
+          }}
+          onDragLeave={() => setIsStageDragOver(false)}
+          onDrop={handleDeviceDrop}
+        >
+          <div className="figdev__stage-audience">AUDIENCE / PUBLIC SIDE</div>
+          <div className="figdev__stage-surface">
+            <span className="figdev__stage-label">STAGE / DRAG DEVICES HERE</span>
+            {placedDevices.length > 0 ? placedDevices.map((device) => (
+              <PlacedDeviceGraphic
+                key={device.instanceId}
+                placedDevice={device}
+                onMove={(instanceId, x, y) => updatePlacedDevice(instanceId, { x, y })}
+                onResize={(instanceId, width, height) => updatePlacedDevice(instanceId, { width, height })}
+                onDelete={(instanceId) => setPlacedDevices((current) => current.filter((item) => item.instanceId !== instanceId))}
+                onDetails={(deviceDetails) => deviceDetails.name === 'Audio Player' ? setIsSessionOpen(true) : setSelectedDevice(deviceDetails)}
+              />
+            )) : (
+              <div className="figdev__stage-empty">
+                <span>+</span>
+                <strong>Place a device</strong>
+                <small>Drag any device from the list</small>
               </div>
-              <span className="figdev__timecode">02:14 / 03:42</span>
-            </div>
-            <div className={`figdev__visualizer ${isPlaying ? 'figdev__visualizer--playing' : ''}`} aria-label="Audio waveform visualization">
-              {Array.from({ length: 48 }, (_, index) => (
-                <span key={index} style={{ '--bar-height': `${24 + ((index * 17) % 66)}%` } as React.CSSProperties} />
-              ))}
-            </div>
-            <div className="figdev__transport">
-              <button className="figdev__transport-button" type="button" aria-label="Previous track">|&lt;</button>
-              <button className="figdev__transport-button figdev__transport-button--primary" type="button" onClick={() => setIsPlaying((playing) => !playing)} aria-label={isPlaying ? 'Pause' : 'Play'}>
-                {isPlaying ? '||' : '>'}
-              </button>
-              <button className="figdev__transport-button" type="button" aria-label="Next track">&gt;|</button>
-              <div className="figdev__transport-progress"><span /></div>
-              <span className="figdev__transport-volume">VOL 72%</span>
-            </div>
+            )}
           </div>
-
-          <div className="figdev__mixer-panel figdev__reveal">
-            <div className="figdev__panel-heading">
-              <div>
-                <p className="figdev__eyebrow">Signal chain</p>
-                <h2>Live mixer</h2>
-              </div>
-              <span className="figdev__live-label">LIVE</span>
-            </div>
-            <div className="figdev__mixer-control">
-              <div className="figdev__mixer-control-label"><span>Atmosphere</span><strong>68</strong></div>
-              <div className="figdev__meter"><span style={{ width: '68%' }} /></div>
-            </div>
-            <div className="figdev__mixer-control">
-              <div className="figdev__mixer-control-label"><span>Low end</span><strong>42</strong></div>
-              <div className="figdev__meter"><span style={{ width: '42%' }} /></div>
-            </div>
-            <div className="figdev__mixer-control">
-              <div className="figdev__mixer-control-label"><span>Presence</span><strong>81</strong></div>
-              <div className="figdev__meter"><span style={{ width: '81%' }} /></div>
-            </div>
-            <button className="figdev__mixer-button" type="button">Open channel rack <span>+</span></button>
-          </div>
-        </section>
-
-        <section className="figdev__library figdev__reveal" id="library">
-          <div className="figdev__section-heading">
-            <div>
-              <p className="figdev__eyebrow">Source material</p>
-              <h2>Session library</h2>
-            </div>
-            <button className="figdev__text-button" type="button">View all <span>-&gt;</span></button>
-          </div>
-          <div className="figdev__track-list">
-            {tracks.map((track, index) => (
-              <button className={`figdev__track ${index === 0 ? 'figdev__track--active' : ''}`} key={track.name} type="button">
-                <span className="figdev__track-number">0{index + 1}</span>
-                <span className="figdev__track-name">{track.name}<small>{track.artist}</small></span>
-                <span className="figdev__track-duration">{track.duration}</span>
-                <span className="figdev__track-arrow">-&gt;</span>
-              </button>
-            ))}
+          <div className="figdev__stage-legend" aria-label="Stage port legend">
+            <span><i className="figdev__legend-swatch figdev__legend-swatch--input" /> INPUT</span>
+            <span><i className="figdev__legend-swatch figdev__legend-swatch--output" /> OUTPUT</span>
+            <span><i className="figdev__legend-swatch figdev__legend-swatch--bidirectional" /> BIDIRECTIONAL</span>
           </div>
         </section>
       </main>
+      <DeviceDetailsModal device={selectedDevice} onClose={() => setSelectedDevice(null)} />
+      {isSessionOpen && <SessionModal onClose={() => setIsSessionOpen(false)} />}
     </div>
   )
 }

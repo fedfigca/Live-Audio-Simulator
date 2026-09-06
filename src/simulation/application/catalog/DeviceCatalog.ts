@@ -28,6 +28,7 @@ export interface DeviceSummary {
   name: string
   category: string
   ports: DevicePortSummary[]
+  physicalPorts: DevicePortSummary[]
 }
 
 export interface DeviceCatalog {
@@ -106,12 +107,29 @@ function summarizePorts(ports: Port[]): DevicePortSummary[] {
   }))
 }
 
+function summarizePhysicalPorts(ports: Port[]): DevicePortSummary[] {
+  return ports.map((port) => ({
+    name: port.name,
+    connector: port.connector,
+    acceptedConnectors: port.acceptedConnectors,
+    direction: port.direction,
+    channels: port.maxChannels,
+    signalLevel: port.signalLevel,
+    impedance: port.impedance,
+    providesPhantomPower: port.providesPhantomPower,
+    requiresPhantomPower: port.requiresPhantomPower,
+  }))
+}
+
 function summarizeDevice(device: StageDevice): DeviceSummary {
+  const physicalPorts = [...device.inputs, ...device.outputs]
+
   return {
     id: device.id,
     name: device.name,
     category: device.category,
-    ports: summarizePorts([...device.inputs, ...device.outputs]),
+    ports: summarizePorts(physicalPorts),
+    physicalPorts: summarizePhysicalPorts(physicalPorts),
   }
 }
 
