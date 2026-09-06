@@ -1,0 +1,517 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --figdev-base-color: #232c22;
+  --figdev-dark-base: #111411;
+  --figdev-color-background: var(--figdev-dark-base);
+  --figdev-color-surface: color-mix(
+    in oklab,
+    var(--figdev-base-color) 35%,
+    var(--figdev-dark-base)
+  );
+  --figdev-color-surface-raised: color-mix(
+    in oklab,
+    var(--figdev-base-color) 60%,
+    var(--figdev-dark-base)
+  );
+  --figdev-color-ink: color-mix(
+    in oklab,
+    white 90%,
+    var(--figdev-base-color)
+  );
+  --figdev-color-muted: color-mix(
+    in oklab,
+    white 48%,
+    var(--figdev-base-color)
+  );
+  --figdev-color-line: color-mix(
+    in srgb,
+    var(--figdev-color-ink) 14%,
+    transparent
+  );
+  --figdev-color-accent: oklch(
+    from var(--figdev-base-color)
+    0.9
+    0.17
+    calc(h - 30)
+  );
+  --figdev-color-accent-soft: color-mix(
+    in srgb,
+    var(--figdev-color-accent) 18%,
+    transparent
+  );
+  --figdev-color-waveform: color-mix(
+    in oklab,
+    var(--figdev-base-color) 78%,
+    var(--figdev-color-ink)
+  );
+  --figdev-color-track: color-mix(
+    in oklab,
+    var(--figdev-base-color) 60%,
+    var(--figdev-dark-base)
+  );
+  --ink: var(--figdev-color-ink);
+  --muted: var(--figdev-color-muted);
+  --line: var(--figdev-color-line);
+  --panel: var(--figdev-color-surface);
+  --accent: var(--figdev-color-accent);
+  --accent-soft: var(--figdev-color-accent-soft);
+
+  color: var(--figdev-color-ink);
+  background: var(--figdev-color-background);
+  color-scheme: dark;
+  font-family: 'Space Grotesk', sans-serif;
+  font-synthesis: none;
+  --mono: 'DM Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+a {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.figdev__app {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 100vh;
+  background: radial-gradient(
+    circle at 68% 0%,
+    var(--figdev-color-surface-raised) 0,
+    var(--figdev-color-background) 38rem
+  );
+}
+
+.figdev__sidebar {
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 2.5rem 1.5rem 1.5rem;
+}
+
+.figdev__brand {
+  align-items: center;
+  display: flex;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  gap: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.figdev__brand-pulse {
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px var(--accent-soft);
+  height: 8px;
+  width: 8px;
+}
+
+.figdev__sidebar nav {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 7rem;
+}
+
+.figdev__nav-link {
+  align-items: center;
+  border-left: 1px solid transparent;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.95rem;
+  gap: 1rem;
+  padding: 0.9rem 0.8rem;
+  text-decoration: none;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.figdev__nav-link:hover,
+.figdev__nav-link--active {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.figdev__nav-link-index,
+.figdev__eyebrow,
+.figdev__timecode,
+.figdev__live-label,
+.figdev__connection-status,
+.figdev__transport-volume,
+.figdev__track-number,
+.figdev__track-duration {
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.figdev__nav-link-index {
+  color: var(--muted);
+}
+
+.figdev__sidebar-footer {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  line-height: 1.6;
+  margin: auto 0 0;
+  max-width: 10rem;
+}
+
+.figdev__main {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 2.5rem clamp(1.5rem, 5vw, 5rem) 5rem;
+  width: 100%;
+}
+
+.figdev__topbar,
+.figdev__panel-heading,
+.figdev__section-heading,
+.figdev__transport,
+.figdev__mixer-control-label,
+.figdev__track {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.figdev__topbar {
+  margin-bottom: clamp(3rem, 9vw, 7rem);
+}
+
+.figdev__eyebrow {
+  color: var(--accent);
+  margin: 0 0 0.8rem;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: clamp(2.8rem, 6vw, 5.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  margin-bottom: 0;
+  max-width: 8ch;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.figdev__connection-status {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  gap: 0.65rem;
+}
+
+.figdev__status-dot {
+  background: var(--accent);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.figdev__studio {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(260px, 0.75fr);
+}
+
+.figdev__visualizer-panel,
+.figdev__mixer-panel {
+  background: var(--panel);
+  min-height: 390px;
+  padding: clamp(1.4rem, 3vw, 2.5rem);
+}
+
+.figdev__visualizer-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.figdev__panel-heading {
+  margin-bottom: 3.5rem;
+}
+
+.figdev__timecode,
+.figdev__live-label {
+  color: var(--muted);
+}
+
+.figdev__live-label {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 0.35rem 0.5rem;
+}
+
+.figdev__visualizer {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  justify-content: center;
+  min-height: 130px;
+}
+
+.figdev__visualizer span {
+  background: var(--figdev-color-waveform);
+  height: var(--bar-height);
+  max-height: 100%;
+  min-height: 10%;
+  transition: background 250ms ease, height 250ms ease;
+  width: 100%;
+}
+
+.figdev__visualizer--playing span {
+  animation: pulse 850ms ease-in-out infinite alternate;
+  background: var(--accent);
+}
+
+.figdev__visualizer--playing span:nth-child(3n) {
+  animation-delay: 130ms;
+}
+
+.figdev__visualizer--playing span:nth-child(4n) {
+  animation-delay: 280ms;
+}
+
+@keyframes pulse {
+  to {
+    height: 35%;
+  }
+}
+
+.figdev__transport {
+  gap: 1rem;
+  margin-top: 3rem;
+}
+
+.figdev__transport-button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  padding: 0.4rem;
+}
+
+.figdev__transport-button:hover {
+  color: var(--ink);
+}
+
+.figdev__transport-button--primary {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 50%;
+  color: var(--figdev-color-background);
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.figdev__transport-progress {
+  background: var(--figdev-color-track);
+  flex: 1;
+  height: 2px;
+}
+
+.figdev__transport-progress span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+  width: 58%;
+}
+
+.figdev__transport-volume {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.figdev__mixer-panel {
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+.figdev__mixer-control {
+  margin-bottom: 2rem;
+}
+
+.figdev__mixer-control-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.7rem;
+}
+
+.figdev__mixer-control-label strong {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.figdev__meter {
+  background: var(--figdev-color-track);
+  height: 4px;
+}
+
+.figdev__meter span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+}
+
+.figdev__mixer-button,
+.figdev__text-button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: auto;
+  padding: 0;
+  text-align: left;
+}
+
+.figdev__mixer-button span,
+.figdev__text-button span {
+  color: var(--accent);
+  margin-left: 0.5rem;
+}
+
+.figdev__library {
+  margin-top: 5rem;
+}
+
+.figdev__section-heading {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1.5rem;
+}
+
+.figdev__text-button:hover {
+  color: var(--ink);
+}
+
+.figdev__track-list {
+  display: grid;
+}
+
+.figdev__track {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  gap: 1rem;
+  padding: 1.15rem 0;
+  text-align: left;
+  transition: padding 180ms ease, color 180ms ease;
+}
+
+.figdev__track:hover,
+.figdev__track--active {
+  color: var(--accent);
+  padding-left: 0.7rem;
+}
+
+.figdev__track-number {
+  color: var(--muted);
+  width: 2rem;
+}
+
+.figdev__track-name {
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.figdev__track-name small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.figdev__track-duration {
+  color: var(--muted);
+}
+
+.figdev__track-arrow {
+  font-family: var(--mono);
+  width: 2rem;
+}
+
+@media (max-width: 760px) {
+  .figdev__app {
+    display: block;
+  }
+
+  .figdev__sidebar {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    display: block;
+    padding: 1.3rem 1.5rem;
+  }
+
+  .figdev__sidebar nav {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 1.5rem;
+  }
+
+  .figdev__nav-link {
+    font-size: 0.8rem;
+    padding: 0.55rem;
+  }
+
+  .figdev__sidebar-footer {
+    display: none;
+  }
+
+  .figdev__main {
+    padding-top: 2.2rem;
+  }
+
+  .figdev__topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .figdev__studio {
+    grid-template-columns: 1fr;
+  }
+
+  .figdev__mixer-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    min-height: auto;
+  }
+
+  .figdev__visualizer-panel {
+    min-height: 350px;
+  }
+
+  .figdev__transport-volume {
+    display: none;
+  }
+}
