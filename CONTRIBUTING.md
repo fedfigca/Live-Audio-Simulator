@@ -53,6 +53,7 @@ Use React's current patterns and keep animation lifecycle management inside Reac
 - Keep the domain layer independent of React, Hono, Vite, and browser APIs.
 - Put orchestration and use cases in `src/simulation/application/`; put persistence and external integrations in `src/simulation/infrastructure/`.
 - Register every available device in `src/simulation/application/catalog/DeviceCatalog.ts`; the Hono `GET /api/devices` route sends frontend-safe summaries to the React sidebar.
+- Keep cable compatibility rules in `src/simulation/domain/stage/entities/cables/ConnectionService.ts`; do not duplicate connector or signal-level rules in React.
 - Do not invent or duplicate the master object API before its source implementation is provided.
 
 ## Class naming

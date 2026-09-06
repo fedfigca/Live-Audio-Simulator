@@ -18,6 +18,7 @@ simulation/
           players/              # Audio playback sources
         outputs/                 # Speakers, headphones, and future system outputs
         processors/              # Mixers, EQs, and future signal processors
+        cables/                  # Cable connections and compatibility rules
       value-objects/            # Immutable domain values such as dimensions, positions, and channels
     shared/                     # Domain primitives shared by multiple stage areas
   application/
@@ -154,6 +155,21 @@ For multiple mono outputs, call `addAudioOutput()` once per physical output and 
 Finally, export the class from `domain/stage/entities/sources/index.ts`. Do not duplicate domain logic in React components or Hono route handlers.
 
 For output devices, extend `OutputDevice` and add physical inputs with `addAudioInput()`. For processors, extend `ProcessorDevice`, add inputs and outputs as required, and implement the routing or transformation in `processSignal()`. Export new classes from the matching `outputs/index.ts` or `processors/index.ts` barrel.
+
+## Cable connections
+
+`domain/stage/entities/cables/AudioCable.ts` models a connection between two physical port endpoints. `ConnectionService.ts` contains the shared compatibility rule used by future backend workflows and the React canvas:
+
+- One endpoint must be an output or bidirectional port.
+- The receiving endpoint must be an input or bidirectional port.
+- Both ports must be analog connectors supported by the stage model.
+- Combo inputs must list the source connector in `acceptedConnectors`.
+- When both ports declare a signal level, the levels must match.
+- A port already marked connected cannot receive another cable.
+
+The frontend keeps grouped summaries for the sidebar but receives `physicalPorts` with stable port IDs for cable interaction. Press and hold an eligible output port, drag to a highlighted compatible input, and release to create a cable. Cable paths are rendered as orthogonal floor routes and avoid the bounds of other placed devices.
+
+Completed cables animate dashed flow from their output endpoint toward their input endpoint. Each output endpoint generates a stable cable hue, and hovering a cable reveals a Lucide close control for deleting that connection.
 
 ## Frontend device catalog
 

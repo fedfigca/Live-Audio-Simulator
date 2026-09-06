@@ -14,9 +14,10 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
+import { canConnectAudioPorts } from '../simulation/domain/stage/entities/cables/ConnectionService'
 
 const tracks = [
   { name: 'Late Night Transit', artist: 'Signal Bloom', duration: '03:42' },
@@ -36,6 +37,23 @@ type PlacedDevice = DeviceSummary & {
   y: number
   width: number
   height: number
+}
+
+type CableEndpoint = {
+  deviceInstanceId: string
+  portId: string
+}
+
+type PlacedCable = {
+  id: string
+  from: CableEndpoint
+  to: CableEndpoint
+}
+
+type CableDraft = {
+  from: CableEndpoint
+  sourcePort: DeviceSummary['physicalPorts'][number]
+  pointer: { x: number; y: number }
 }
 
 function getDefaultDeviceSize(device: DeviceSummary): { width: number; height: number } {
@@ -198,23 +216,196 @@ function DeviceIconCard({ device }: { device: DeviceSummary }) {
   return <Icon className="figdev__device-icon" aria-hidden="true" strokeWidth={1.5} />
 }
 
+type Point = { x: number; y: number }
+type Rect = { left: number; top: number; right: number; bottom: number; deviceInstanceId: string }
+type CablePath = { id: string; path: string; anchor: Point; color?: string }
+
+function segmentsHitRect(points: Point[], rect: Rect, padding = 12): boolean {
+  const expanded = {
+    left: rect.left - padding,
+    top: rect.top - padding,
+    right: rect.right + padding,
+    bottom: rect.bottom + padding,
+  }
+
+  return points.slice(1).some((point, index) => {
+    const previous = points[index]
+    const horizontal = previous.y === point.y
+    const vertical = previous.x === point.x
+
+    if (horizontal) {
+      const left = Math.min(previous.x, point.x)
+      const right = Math.max(previous.x, point.x)
+      return point.y >= expanded.top && point.y <= expanded.bottom && right >= expanded.left && left <= expanded.right
+    }
+
+    if (vertical) {
+      const top = Math.min(previous.y, point.y)
+      const bottom = Math.max(previous.y, point.y)
+      return point.x >= expanded.left && point.x <= expanded.right && bottom >= expanded.top && top <= expanded.bottom
+    }
+
+    return false
+  })
+}
+
+function createOrthogonalPath(start: Point, end: Point, obstacles: Rect[], width: number, height: number): string {
+  const middleX = (start.x + end.x) / 2
+  const middleY = (start.y + end.y) / 2
+  const candidates = [
+    [start, { x: middleX, y: start.y }, { x: middleX, y: end.y }, end],
+    [start, { x: start.x, y: middleY }, { x: end.x, y: middleY }, end],
+    [start, { x: start.x, y: 24 }, { x: end.x, y: 24 }, end],
+    [start, { x: start.x, y: height - 24 }, { x: end.x, y: height - 24 }, end],
+    [start, { x: 24, y: start.y }, { x: 24, y: end.y }, end],
+    [start, { x: width - 24, y: start.y }, { x: width - 24, y: end.y }, end],
+  ]
+  const route = candidates.find((candidate) => !obstacles.some((obstacle) => segmentsHitRect(candidate, obstacle))) ?? candidates[0]
+
+  return route.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+}
+
+function cableColor(endpoint: CableEndpoint): string {
+  const value = `${endpoint.deviceInstanceId}:${endpoint.portId}`.split('').reduce(
+    (hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0,
+    0,
+  )
+  return `hsl(${Math.abs(value) % 360} 78% 62%)`
+}
+
+function CableLayer({
+  cables,
+  draft,
+  placedDevices,
+  stageRef,
+  onDeleteCable,
+}: {
+  cables: PlacedCable[]
+  draft: CableDraft | null
+  placedDevices: PlacedDevice[]
+  stageRef: React.RefObject<HTMLDivElement | null>
+  onDeleteCable: (cableId: string) => void
+}) {
+  const [paths, setPaths] = useState<CablePath[]>([])
+  const [size, setSize] = useState({ width: 1, height: 1 })
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    const stageBounds = stage.getBoundingClientRect()
+    setSize({ width: stageBounds.width, height: stageBounds.height })
+    const getPoint = (endpoint: CableEndpoint): Point | null => {
+      const element = stage.querySelector<HTMLElement>(`[data-device-instance="${endpoint.deviceInstanceId}"][data-port-id="${endpoint.portId}"]`)
+      if (!element) return null
+      const bounds = element.getBoundingClientRect()
+      return {
+        x: bounds.left + bounds.width / 2 - stageBounds.left,
+        y: bounds.top + bounds.height / 2 - stageBounds.top,
+      }
+    }
+    const obstacles = placedDevices.map((device) => {
+      const element = stage.querySelector<HTMLElement>(`[data-device-instance="${device.instanceId}"]`)
+      if (!element) return null
+      const bounds = element.getBoundingClientRect()
+      return {
+        left: bounds.left - stageBounds.left,
+        top: bounds.top - stageBounds.top,
+        right: bounds.right - stageBounds.left,
+        bottom: bounds.bottom - stageBounds.top,
+        deviceInstanceId: device.instanceId,
+      }
+    }).filter((obstacle): obstacle is Rect => obstacle !== null)
+
+    const nextPaths: CablePath[] = cables.flatMap((cable) => {
+      const start = getPoint(cable.from)
+      const end = getPoint(cable.to)
+      if (!start || !end) return []
+      const cableObstacles = obstacles.filter((obstacle) => ![cable.from.deviceInstanceId, cable.to.deviceInstanceId].includes(obstacle.deviceInstanceId))
+      return [{
+        id: cable.id,
+        path: createOrthogonalPath(start, end, cableObstacles, stageBounds.width, stageBounds.height),
+        anchor: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+        color: cableColor(cable.from),
+      }]
+    })
+
+    if (draft) {
+      const start = getPoint(draft.from)
+      if (start) {
+        nextPaths.push({
+          id: 'draft',
+          path: createOrthogonalPath(start, draft.pointer, obstacles.filter((obstacle) => obstacle.deviceInstanceId !== draft.from.deviceInstanceId), stageBounds.width, stageBounds.height),
+          anchor: draft.pointer,
+          color: undefined,
+        })
+      }
+    }
+
+    setPaths(nextPaths)
+  }, [cables, placedDevices, draft, stageRef])
+
+  return (
+    <svg className="figdev__cable-layer" viewBox={`0 0 ${size.width} ${size.height}`} preserveAspectRatio="none" aria-hidden="true">
+      {paths.map((item) => item.id === 'draft' ? (
+        <path className="figdev__cable figdev__cable--draft" d={item.path} key={item.id} />
+      ) : (
+        <g className="figdev__cable-group" key={item.id} style={{ '--cable-color': item.color } as React.CSSProperties}>
+          <path className="figdev__cable" d={item.path} />
+          <path className="figdev__cable-hit" d={item.path} />
+          <foreignObject className="figdev__cable-control" x={item.anchor.x - 12} y={item.anchor.y - 12} width="24" height="24">
+            <button type="button" onClick={() => onDeleteCable(item.id)} aria-label="Delete cable" title="Delete cable">
+              <X size={12} strokeWidth={2.5} />
+            </button>
+          </foreignObject>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 function GenericDeviceGraphic({
   device,
+  deviceInstanceId = device.id,
+  cableDraft,
+  onPortPointerDown,
+  onPortPointerUp,
 }: {
   device: DeviceSummary
+  deviceInstanceId?: string
+  cableDraft: CableDraft | null
+  onPortPointerDown: (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => void
+  onPortPointerUp: (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => void
 }) {
   const physicalPorts = device.physicalPorts ?? device.ports
   const inputs = physicalPorts.filter((port) => port.direction === 'input')
   const outputs = physicalPorts.filter((port) => port.direction === 'output')
   const bidirectional = physicalPorts.filter((port) => port.direction === 'bidirectional')
 
-  const renderPort = (port: typeof physicalPorts[number], type: 'input' | 'output' | 'bidirectional') => (
-    <span className={`figdev__port-wrap figdev__port-wrap--${type}`} key={`${type}-${port.name}`}>
+  const renderPort = (port: typeof physicalPorts[number], type: 'input' | 'output' | 'bidirectional') => {
+    const isSource = cableDraft?.from.deviceInstanceId === deviceInstanceId && cableDraft.from.portId === port.id
+    const isTarget = Boolean(cableDraft && !isSource && canConnectAudioPorts(
+      { ...cableDraft.sourcePort, deviceId: cableDraft.from.deviceInstanceId },
+      { ...port, deviceId: deviceInstanceId },
+    ))
+
+    return (
+    <button
+      className={`figdev__port-wrap figdev__port-wrap--${type} ${isSource ? 'figdev__port-wrap--active' : ''} ${isTarget ? 'figdev__port-wrap--target' : ''}`}
+      data-port-id={port.id}
+      data-device-instance={deviceInstanceId}
+      key={`${type}-${port.name}`}
+      type="button"
+      onPointerDown={(event) => onPortPointerDown({ ...device, id: deviceInstanceId }, port, event)}
+      onPointerUp={(event) => onPortPointerUp({ ...device, id: deviceInstanceId }, port, event)}
+      title={formatPortDetails(port)}
+    >
       <i className={`figdev__port figdev__port--${type}`} aria-label={formatPortDetails(port)} />
       <span className="figdev__port-label">{port.name.replace(/^(Input|Output|Aux) /, '')}</span>
       <span className="figdev__port-tooltip" role="tooltip">{formatPortDetails(port)}</span>
-    </span>
-  )
+    </button>
+    )
+  }
 
   return (
     <div className="figdev__generic-device">
@@ -243,12 +434,18 @@ function PlacedDeviceGraphic({
   onResize,
   onDelete,
   onDetails,
+  cableDraft,
+  onPortPointerDown,
+  onPortPointerUp,
 }: {
   placedDevice: PlacedDevice
   onMove: (instanceId: string, x: number, y: number) => void
   onResize: (instanceId: string, width: number, height: number) => void
   onDelete: (instanceId: string) => void
   onDetails: (device: DeviceSummary) => void
+  cableDraft: CableDraft | null
+  onPortPointerDown: (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => void
+  onPortPointerUp: (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => void
 }) {
   const item = useRef<HTMLDivElement>(null)
   const dragOrigin = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(null)
@@ -296,13 +493,14 @@ function PlacedDeviceGraphic({
     <div
       className="figdev__placed-device"
       ref={item}
+      data-device-instance={placedDevice.instanceId}
       style={{ left: `${placedDevice.x}%`, top: `${placedDevice.y}%`, width: `${placedDevice.width}%`, height: `${placedDevice.height}%` }}
       onPointerDown={beginMove}
       onPointerMove={move}
       onPointerUp={endMove}
       onPointerCancel={endMove}
     >
-      <GenericDeviceGraphic device={placedDevice} />
+      <GenericDeviceGraphic device={placedDevice} deviceInstanceId={placedDevice.instanceId} cableDraft={cableDraft} onPortPointerDown={onPortPointerDown} onPortPointerUp={onPortPointerUp} />
       <button className="figdev__placed-device-info" type="button" onClick={() => onDetails(placedDevice)} aria-label={`Open ${placedDevice.name} details`} title="Device info">
         <Info size={14} strokeWidth={2.25} />
       </button>
@@ -475,7 +673,10 @@ function App() {
   const [selectedDevice, setSelectedDevice] = useState<DeviceSummary | null>(null)
   const [isSessionOpen, setIsSessionOpen] = useState(false)
   const [placedDevices, setPlacedDevices] = useState<PlacedDevice[]>([])
+  const [cables, setCables] = useState<PlacedCable[]>([])
+  const [cableDraft, setCableDraft] = useState<CableDraft | null>(null)
   const [isStageDragOver, setIsStageDragOver] = useState(false)
+  const stageSurface = useRef<HTMLDivElement>(null)
   const [openAccordion, setOpenAccordion] = useState<AccordionKey | null>(null)
   const [pinnedAccordions, setPinnedAccordions] = useState<AccordionKey[]>([])
   const [baseColor, setBaseColor] = useState(() => (
@@ -561,6 +762,54 @@ function App() {
     pinnedAccordions.includes(key) || openAccordion === key
   )
 
+  const getPointerInStage = (event: React.PointerEvent) => {
+    const bounds = stageSurface.current?.getBoundingClientRect()
+    if (!bounds) return { x: event.clientX, y: event.clientY }
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
+  }
+
+  const beginCable = (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (port.direction === 'input') return
+
+    setCableDraft({
+      from: { deviceInstanceId: device.id, portId: port.id },
+      sourcePort: port,
+      pointer: getPointerInStage(event),
+    })
+  }
+
+  const finishCable = (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!cableDraft) return
+
+    const target = { deviceInstanceId: device.id, portId: port.id }
+    const endpointIsUsed = cables.some((cable) => (
+      [cable.from, cable.to].some((endpoint) => endpoint.deviceInstanceId === target.deviceInstanceId && endpoint.portId === target.portId)
+    ))
+    const source = { ...cableDraft.sourcePort, deviceId: cableDraft.from.deviceInstanceId }
+    if (cableDraft.from.deviceInstanceId === target.deviceInstanceId && cableDraft.from.portId === target.portId) {
+      setCableDraft(null)
+      return
+    }
+
+    if (!endpointIsUsed && canConnectAudioPorts(source, { ...port, deviceId: device.id })) {
+      setCables((current) => [...current, {
+        id: `cable-${Date.now()}`,
+        from: cableDraft.from,
+        to: target,
+      }])
+    }
+
+    setCableDraft(null)
+  }
+
+  const updateCableDraft = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (cableDraft) setCableDraft({ ...cableDraft, pointer: getPointerInStage(event) })
+  }
+
   return (
     <div className="figdev__app" ref={container}>
       <aside className="figdev__sidebar figdev__reveal">
@@ -620,8 +869,15 @@ function App() {
           onDrop={handleDeviceDrop}
         >
           <div className="figdev__stage-audience">AUDIENCE / PUBLIC SIDE</div>
-          <div className="figdev__stage-surface">
+          <div className="figdev__stage-surface" ref={stageSurface} onPointerMove={updateCableDraft} onPointerUp={() => setCableDraft(null)}>
             <span className="figdev__stage-label">STAGE / DRAG DEVICES HERE</span>
+            <CableLayer
+              cables={cables}
+              draft={cableDraft}
+              placedDevices={placedDevices}
+              stageRef={stageSurface}
+              onDeleteCable={(cableId) => setCables((current) => current.filter((cable) => cable.id !== cableId))}
+            />
             {placedDevices.length > 0 ? placedDevices.map((device) => (
               <PlacedDeviceGraphic
                 key={device.instanceId}
@@ -630,6 +886,9 @@ function App() {
                 onResize={(instanceId, width, height) => updatePlacedDevice(instanceId, { width, height })}
                 onDelete={(instanceId) => setPlacedDevices((current) => current.filter((item) => item.instanceId !== instanceId))}
                 onDetails={(deviceDetails) => deviceDetails.name === 'Audio Player' ? setIsSessionOpen(true) : setSelectedDevice(deviceDetails)}
+                cableDraft={cableDraft}
+                onPortPointerDown={beginCable}
+                onPortPointerUp={finishCable}
               />
             )) : (
               <div className="figdev__stage-empty">

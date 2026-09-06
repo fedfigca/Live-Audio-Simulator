@@ -449,6 +449,80 @@ button {
   transition: border-color 180ms ease, background-color 180ms ease;
 }
 
+.figdev__cable-layer {
+  height: 100%;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 1;
+}
+
+.figdev__cable {
+  fill: none;
+  filter: drop-shadow(0 0.18rem 0.12rem var(--figdev-dark-base));
+  stroke: var(--cable-color, var(--figdev-color-icon));
+  stroke-dasharray: 0.8rem 0.55rem;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5;
+  animation: figdev-cable-flow 720ms linear infinite;
+}
+
+.figdev__cable--draft {
+  stroke: var(--accent);
+  stroke-dasharray: 0.4rem 0.35rem;
+  stroke-width: 4;
+  animation: none;
+}
+
+.figdev__cable-hit {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-width: 1.2rem;
+}
+
+.figdev__cable-control {
+  opacity: 0;
+  overflow: visible;
+  pointer-events: auto;
+  transition: opacity 140ms ease;
+}
+
+.figdev__cable-group:hover .figdev__cable-control,
+.figdev__cable-control:focus-within {
+  opacity: 1;
+}
+
+.figdev__cable-control button {
+  align-items: center;
+  background: var(--figdev-dark-base);
+  border: 1px solid var(--cable-color, var(--accent));
+  border-radius: 50%;
+  color: var(--cable-color, var(--accent));
+  display: flex;
+  height: 1.5rem;
+  justify-content: center;
+  padding: 0;
+  width: 1.5rem;
+}
+
+.figdev__cable-control button:hover,
+.figdev__cable-control button:focus-visible {
+  background: var(--cable-color, var(--accent));
+  color: var(--figdev-dark-base);
+  outline: none;
+}
+
+@keyframes figdev-cable-flow {
+  to {
+    stroke-dashoffset: -1.35rem;
+  }
+}
+
 .figdev__stage-surface::before {
   border: 1px solid var(--figdev-color-accent-soft);
   content: '';
@@ -689,8 +763,11 @@ button {
 
 .figdev__port-wrap {
   align-items: center;
+  background: transparent;
+  border: 0;
   display: flex;
   gap: 0.2rem;
+  padding: 0;
   position: relative;
 }
 
@@ -744,6 +821,23 @@ button {
   opacity: 1;
   transform: translate(-50%, -100%);
   visibility: visible;
+}
+
+.figdev__port-wrap--active .figdev__port,
+.figdev__port-wrap--target .figdev__port {
+  box-shadow: 0 0 0 0.25rem var(--figdev-color-accent-soft), 0 0 1rem var(--figdev-color-accent);
+  filter: saturate(1.5) brightness(1.35);
+  transform: scale(1.3);
+}
+
+.figdev__port-wrap--target .figdev__port {
+  animation: figdev-port-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes figdev-port-pulse {
+  to {
+    box-shadow: 0 0 0 0.35rem var(--figdev-color-accent-soft), 0 0 1.25rem var(--figdev-color-accent);
+  }
 }
 
 @container figdev-device (max-width: 14rem) {

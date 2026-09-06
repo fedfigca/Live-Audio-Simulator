@@ -12,6 +12,7 @@ import {
 export type DeviceCatalogCategory = 'sources' | 'outputs' | 'processors'
 
 export interface DevicePortSummary {
+  id: string
   name: string
   connector: string
   acceptedConnectors?: string[]
@@ -81,6 +82,7 @@ function summarizePorts(ports: Port[]): DevicePortSummary[] {
 
   for (const port of ports) {
     const summary: DevicePortSummary = {
+      id: port.id,
       name: port.name,
       connector: port.connector,
       acceptedConnectors: port.acceptedConnectors,
@@ -109,6 +111,7 @@ function summarizePorts(ports: Port[]): DevicePortSummary[] {
 
 function summarizePhysicalPorts(ports: Port[]): DevicePortSummary[] {
   return ports.map((port) => ({
+    id: port.id,
     name: port.name,
     connector: port.connector,
     acceptedConnectors: port.acceptedConnectors,
