@@ -9,6 +9,12 @@ const tracks = [
   { name: 'Soft Focus', artist: 'North Arcade', duration: '02:56' },
 ]
 
+const COLOR_STORAGE_KEY = 'figdev-base-color'
+const COLOR_PRESETS = [
+  { name: 'Captain Bluebeard', value: '#1A2B3C' },
+  { name: 'Moss Boss', value: '#232C22' },
+]
+
 function formatPortSummary(device: DeviceSummary): string {
   return device.ports
     .map((port) => {
@@ -78,11 +84,88 @@ function DeviceAccordion({
   )
 }
 
+function SettingsPanel({
+  baseColor,
+  onColorChange,
+}: {
+  baseColor: string
+  onColorChange: (color: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const content = useRef<HTMLDivElement>(null)
+  const chevron = useRef<HTMLSpanElement>(null)
+
+  useGSAP(
+    () => {
+      if (!content.current || !chevron.current) return
+
+      gsap.to(content.current, {
+        height: isOpen ? 'auto' : 0,
+        duration: 0.24,
+        ease: 'power2.out',
+      })
+      gsap.to(chevron.current, {
+        rotate: isOpen ? 90 : 0,
+        duration: 0.24,
+        ease: 'power2.out',
+      })
+    },
+    { dependencies: [isOpen] },
+  )
+
+  return (
+    <section className="figdev__settings">
+      <button
+        className="figdev__settings-toggle"
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span>Settings</span>
+        <span className="figdev__settings-chevron" ref={chevron}>-&gt;</span>
+      </button>
+      <div className="figdev__settings-content" ref={content}>
+        <div className="figdev__settings-options">
+          {COLOR_PRESETS.map((preset) => (
+            <button
+              className={`figdev__color-preset ${baseColor.toUpperCase() === preset.value ? 'figdev__color-preset--active' : ''}`}
+              key={preset.value}
+              type="button"
+              onClick={() => onColorChange(preset.value)}
+            >
+              <span className="figdev__color-swatch" style={{ backgroundColor: preset.value }} />
+              <span>{preset.name}</span>
+            </button>
+          ))}
+          <label className="figdev__color-picker">
+            <span className="figdev__color-swatch" style={{ backgroundColor: baseColor }} />
+            <span>Make it weird</span>
+            <input
+              type="color"
+              value={baseColor}
+              onChange={(event) => onColorChange(event.target.value)}
+              aria-label="Choose a custom base color"
+            />
+          </label>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const container = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [catalog, setCatalog] = useState<DeviceCatalog | null>(null)
   const [catalogError, setCatalogError] = useState(false)
+  const [baseColor, setBaseColor] = useState(() => (
+    localStorage.getItem(COLOR_STORAGE_KEY) ?? COLOR_PRESETS[0].value
+  ))
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--figdev-base-color', baseColor)
+    localStorage.setItem(COLOR_STORAGE_KEY, baseColor)
+  }, [baseColor])
 
   useEffect(() => {
     fetch('/api/devices')
@@ -134,6 +217,7 @@ function App() {
             </p>
           )}
         </div>
+        <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} />
         <p className="figdev__sidebar-footer">Build 0.1 / browser audio lab</p>
       </aside>
 
