@@ -165,12 +165,51 @@ button {
   font-size: 0.78rem;
   justify-content: space-between;
   padding: 0.75rem 0;
+  position: relative;
   text-align: left;
   width: 100%;
 }
 
 .figdev__device-group-toggle:hover {
   color: var(--ink);
+}
+
+.figdev__accordion-pin {
+  color: var(--accent);
+  margin-left: 0.45rem;
+  vertical-align: -0.1rem;
+}
+
+.figdev__settings-toggle {
+  position: relative;
+}
+
+.figdev__accordion-tooltip {
+  background: var(--figdev-label-background);
+  border: 1px solid var(--accent);
+  bottom: calc(100% + 0.35rem);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  left: 0;
+  opacity: 0;
+  padding: 0.4rem 0.5rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translateY(0.25rem);
+  transition: opacity 140ms ease, transform 140ms ease;
+  visibility: hidden;
+  white-space: nowrap;
+  z-index: 12;
+}
+
+.figdev__device-group-toggle:hover .figdev__accordion-tooltip,
+.figdev__device-group-toggle:focus-visible .figdev__accordion-tooltip,
+.figdev__settings-toggle:hover .figdev__accordion-tooltip,
+.figdev__settings-toggle:focus-visible .figdev__accordion-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
 }
 
 .figdev__device-group-chevron {

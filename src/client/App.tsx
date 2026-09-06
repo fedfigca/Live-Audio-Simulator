@@ -9,6 +9,7 @@ import {
   Maximize2,
   MicVocal,
   SlidersHorizontal,
+  Pin,
   Speaker,
   Trash2,
   X,
@@ -315,18 +316,25 @@ function PlacedDeviceGraphic({
   )
 }
 
+type AccordionKey = 'sources' | 'outputs' | 'processors' | 'settings'
+
 function DeviceAccordion({
   title,
   devices,
   onDeviceClick,
   onDeviceDragStart,
+  isOpen,
+  isPinned,
+  onToggle,
 }: {
   title: string
   devices: DeviceSummary[]
   onDeviceClick: (device: DeviceSummary) => void
   onDeviceDragStart: (device: DeviceSummary, event: React.DragEvent<HTMLButtonElement>) => void
+  isOpen: boolean
+  isPinned: boolean
+  onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
-  const [isOpen, setIsOpen] = useState(false)
   const content = useRef<HTMLDivElement>(null)
   const chevron = useRef<HTMLSpanElement>(null)
 
@@ -354,10 +362,13 @@ function DeviceAccordion({
         className="figdev__device-group-toggle"
         type="button"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={onToggle}
       >
-        <span>{title}</span>
+        <span>{title}{isPinned && <Pin className="figdev__accordion-pin" size={11} strokeWidth={2} aria-label="Pinned open" />}</span>
         <span className="figdev__device-group-chevron" ref={chevron}>-&gt;</span>
+        <span className="figdev__accordion-tooltip" role="tooltip">
+          {isPinned ? 'Click to unpin and close' : 'Alt/Option-click to pin open'}
+        </span>
       </button>
       <div className="figdev__device-group-content" ref={content}>
         <div className="figdev__device-list">
@@ -383,11 +394,16 @@ function DeviceAccordion({
 function SettingsPanel({
   baseColor,
   onColorChange,
+  isOpen,
+  isPinned,
+  onToggle,
 }: {
   baseColor: string
   onColorChange: (color: string) => void
+  isOpen: boolean
+  isPinned: boolean
+  onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
-  const [isOpen, setIsOpen] = useState(false)
   const content = useRef<HTMLDivElement>(null)
   const chevron = useRef<HTMLSpanElement>(null)
 
@@ -415,10 +431,13 @@ function SettingsPanel({
         className="figdev__settings-toggle"
         type="button"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={onToggle}
       >
-        <span>Settings</span>
+        <span>Settings{isPinned && <Pin className="figdev__accordion-pin" size={11} strokeWidth={2} aria-label="Pinned open" />}</span>
         <span className="figdev__settings-chevron" ref={chevron}>-&gt;</span>
+        <span className="figdev__accordion-tooltip" role="tooltip">
+          {isPinned ? 'Click to unpin and close' : 'Alt/Option-click to pin open'}
+        </span>
       </button>
       <div className="figdev__settings-content" ref={content}>
         <div className="figdev__settings-options">
@@ -457,6 +476,8 @@ function App() {
   const [isSessionOpen, setIsSessionOpen] = useState(false)
   const [placedDevices, setPlacedDevices] = useState<PlacedDevice[]>([])
   const [isStageDragOver, setIsStageDragOver] = useState(false)
+  const [openAccordion, setOpenAccordion] = useState<AccordionKey | null>(null)
+  const [pinnedAccordions, setPinnedAccordions] = useState<AccordionKey[]>([])
   const [baseColor, setBaseColor] = useState(() => (
     localStorage.getItem(COLOR_STORAGE_KEY) ?? COLOR_PRESETS[0].value
   ))
@@ -520,6 +541,26 @@ function App() {
     )))
   }
 
+  const toggleAccordion = (key: AccordionKey, event: React.MouseEvent<HTMLButtonElement>) => {
+    if (pinnedAccordions.includes(key)) {
+      setPinnedAccordions((current) => current.filter((pinnedKey) => pinnedKey !== key))
+      setOpenAccordion((current) => current === key ? null : current)
+      return
+    }
+
+    if (event.altKey) {
+      setPinnedAccordions((current) => [...current, key])
+      setOpenAccordion(key)
+      return
+    }
+
+    setOpenAccordion((current) => current === key ? null : key)
+  }
+
+  const isAccordionOpen = (key: AccordionKey) => (
+    pinnedAccordions.includes(key) || openAccordion === key
+  )
+
   return (
     <div className="figdev__app" ref={container}>
       <aside className="figdev__sidebar figdev__reveal">
@@ -537,15 +578,15 @@ function App() {
           <p className="figdev__sidebar-label">Stage devices</p>
           {catalog ? (
             <>
-              <DeviceAccordion title="Sources" devices={catalog.sources} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+              <DeviceAccordion title="Sources" devices={catalog.sources} isOpen={isAccordionOpen('sources')} isPinned={pinnedAccordions.includes('sources')} onToggle={(event) => toggleAccordion('sources', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
               }} />
-              <DeviceAccordion title="Outputs" devices={catalog.outputs} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+              <DeviceAccordion title="Outputs" devices={catalog.outputs} isOpen={isAccordionOpen('outputs')} isPinned={pinnedAccordions.includes('outputs')} onToggle={(event) => toggleAccordion('outputs', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
               }} />
-              <DeviceAccordion title="Process devices" devices={catalog.processors} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+              <DeviceAccordion title="Process devices" devices={catalog.processors} isOpen={isAccordionOpen('processors')} isPinned={pinnedAccordions.includes('processors')} onToggle={(event) => toggleAccordion('processors', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
               }} />
@@ -556,7 +597,7 @@ function App() {
             </p>
           )}
         </div>
-        <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} />
+        <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} isOpen={isAccordionOpen('settings')} isPinned={pinnedAccordions.includes('settings')} onToggle={(event) => toggleAccordion('settings', event)} />
         <p className="figdev__sidebar-footer">Build 0.1 / browser audio lab</p>
       </aside>
 
