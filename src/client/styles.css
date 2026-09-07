@@ -663,8 +663,9 @@ button {
 .figdev__placed-device {
   container-name: figdev-device;
   container-type: size;
-  min-height: 7rem;
-  min-width: 10rem;
+  /* smaller defaults: compact footprint to show name, icon and ports */
+  min-height: 4.5rem;
+  min-width: 7rem;
   position: absolute;
   touch-action: none;
   z-index: 2;
@@ -692,7 +693,7 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 7rem;
+  min-height: 4.5rem;
   overflow: visible;
   padding: clamp(0.65rem, 4cqw, 1rem);
   position: relative;
@@ -738,13 +739,13 @@ button {
 
 .figdev__device-icon {
   color: var(--figdev-color-icon);
-  height: clamp(2rem, 18cqw, 5rem);
-  max-height: 42%;
-  max-width: 42%;
-  min-height: 1.75rem;
-  min-width: 1.75rem;
+  height: clamp(1.25rem, 12cqw, 2.2rem);
+  max-height: 50%;
+  max-width: 50%;
+  min-height: 1.1rem;
+  min-width: 1.1rem;
   stroke: currentColor;
-  width: clamp(2rem, 18cqw, 5rem);
+  width: clamp(1.25rem, 12cqw, 2.2rem);
 }
 
 .figdev__generic-device small {
@@ -1011,6 +1012,55 @@ button {
   padding: 1.5rem;
   position: fixed;
   z-index: 10;
+}
+
+/* Full-device overlay shown inset on top of the canvas */
+.figdev__device-overlay {
+  position: fixed;
+  inset: 5%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: color-mix(in srgb, var(--figdev-base-color) 88%, transparent);
+  z-index: 48;
+  pointer-events: auto;
+}
+
+.figdev__device-overlay-panel {
+  background: linear-gradient(rgba(10,10,10,0.06), rgba(10,10,10,0.03));
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255,255,255,0.04);
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: clamp(1rem, 2vw, 2rem);
+  box-shadow: 0 0.95rem 2rem rgba(0,0,0,0.55);
+}
+
+.figdev__device-overlay-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.figdev__device-overlay-close {
+  background: none;
+  border: none;
+  color: var(--figdev-color-on-accent, var(--accent));
+}
+
+.figdev__device-overlay-body {
+  margin-top: 0.5rem;
+}
+
+.figdev__device-overlay-ports {
+  margin-top: 1rem;
+}
+
+.figdev__device-overlay-port {
+  padding: 0.6rem 0;
+  border-bottom: 1px dashed rgba(255,255,255,0.03);
 }
 
 .figdev__modal {

@@ -19,6 +19,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
+import DeviceFullInfo from './DeviceFullInfo'
 import { canConnectAudioPorts } from '../simulation/domain/stage/entities/cables/ConnectionService'
 
 const tracks = [
@@ -62,18 +63,19 @@ type CableDraft = {
 }
 
 function getDefaultDeviceSize(device: DeviceSummary): { width: number; height: number } {
+  // Compact defaults (percent of stage) to match compact screenshot
   if (device.name === 'Mixer') {
-    return { width: 38, height: 46 }
+    return { width: 14, height: 12 }
   }
 
   if (device.name === 'Audio Player') {
-    return { width: 34, height: 32 }
+    return { width: 12, height: 10 }
   }
 
-  return { width: 28, height: 28 }
+  return { width: 10, height: 8 }
 }
 
-function formatPortSummary(device: DeviceSummary): string {
+export function formatPortSummary(device: DeviceSummary): string {
   return device.ports
     .map((port) => {
       const acceptedConnectors = port.acceptedConnectors?.length
@@ -1171,7 +1173,7 @@ function App() {
           </div>
         </section>
       </main>
-      <DeviceDetailsModal device={selectedDevice} onClose={() => setSelectedDevice(null)} />
+      <DeviceFullInfo device={selectedDevice} onClose={() => setSelectedDevice(null)} />
       {isSessionOpen && <SessionModal onClose={() => setIsSessionOpen(false)} />}
     </div>
   )
