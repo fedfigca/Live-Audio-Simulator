@@ -1,5 +1,9 @@
 # Live Audio Simulator
 
+An audio engineer's playground for solving auto-generated stage and signal-flow problems: patch sources, processors, and outputs together on a virtual stage and practice diagnosing and fixing the scenarios the simulator throws at you.
+
+This project also exists as a showcase of modern AI-assisted development, CSS, React, and JavaScript skills, built from scratch as a demo. For example, the entire visual theme is generated from a single base color using modern CSS color math (`color-mix()` and relative `oklch()`), with no hand-picked palette values anywhere else in the stylesheet.
+
 Minimal Hono application powered by Vite and Hono's Vite tooling.
 
 ## Setup
