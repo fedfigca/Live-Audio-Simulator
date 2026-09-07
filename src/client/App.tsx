@@ -722,14 +722,20 @@ function App() {
     if (!device) return
 
     const defaultSize = getDefaultDeviceSize(device)
+    const bounds = stageSurface.current?.getBoundingClientRect()
+    // center the device on the pointer's release position, in percent of the stage surface
+    const dropX = bounds ? ((event.clientX - bounds.left) / bounds.width) * 100 : 8
+    const dropY = bounds ? ((event.clientY - bounds.top) / bounds.height) * 100 : 12
+    const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
+    const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
 
     setPlacedDevices((current) => [
       ...current,
       {
         ...device,
         instanceId: `${device.id}-${Date.now()}`,
-        x: 8 + ((current.length * 9) % Math.max(18, 84 - defaultSize.width)),
-        y: 12 + ((current.length * 7) % Math.max(18, 76 - defaultSize.height)),
+        x,
+        y,
         width: defaultSize.width,
         height: defaultSize.height,
       },

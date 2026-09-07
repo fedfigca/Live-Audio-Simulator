@@ -1,4 +1,5 @@
-import { Port, StageDevice } from '../../domain/stage/Stage'
+import { ConnInfo } from 'hono/conninfo'
+import { ConnectorType, Impedance, Port, PortDirection, SignalLevel, StageDevice } from '../../domain/stage/Stage'
 import { ActiveSpeaker15, Subwoofer18 } from '../../domain/stage/entities/outputs'
 import { Mixer } from '../../domain/stage/entities/processors'
 import {
@@ -14,12 +15,12 @@ export type DeviceCatalogCategory = 'sources' | 'outputs' | 'processors'
 export interface DevicePortSummary {
   id: string
   name: string
-  connector: string
-  acceptedConnectors?: string[]
-  direction: string
+  connector: ConnectorType
+  acceptedConnectors?: ConnectorType[]
+  direction: PortDirection
   channels?: number
-  signalLevel?: string
-  impedance?: string
+  signalLevel?: SignalLevel | SignalLevel[]
+  impedance?: Impedance | Impedance[]
   providesPhantomPower?: boolean
   requiresPhantomPower?: boolean
 }
@@ -27,7 +28,7 @@ export interface DevicePortSummary {
 export interface DeviceSummary {
   id: string
   name: string
-  category: string
+  category: DeviceCatalogCategory
   ports: DevicePortSummary[]
   physicalPorts: DevicePortSummary[]
 }
@@ -124,13 +125,13 @@ function summarizePhysicalPorts(ports: Port[]): DevicePortSummary[] {
   }))
 }
 
-function summarizeDevice(device: StageDevice): DeviceSummary {
+function summarizeDevice(device: StageDevice, category: DeviceCatalogCategory): DeviceSummary {
   const physicalPorts = [...device.inputs, ...device.outputs]
 
   return {
     id: device.id,
     name: device.name,
-    category: device.category,
+    category,
     ports: summarizePorts(physicalPorts),
     physicalPorts: summarizePhysicalPorts(physicalPorts),
   }
@@ -151,8 +152,8 @@ export function buildDeviceCatalog(): DeviceCatalog {
   const processors = [new Mixer('catalog-mixer')]
 
   return {
-    sources: sources.map(summarizeDevice),
-    outputs: outputs.map(summarizeDevice),
-    processors: processors.map(summarizeDevice),
+    sources: sources.map((device) => summarizeDevice(device, 'sources')),
+    outputs: outputs.map((device) => summarizeDevice(device, 'outputs')),
+    processors: processors.map((device) => summarizeDevice(device, 'processors')),
   }
 }

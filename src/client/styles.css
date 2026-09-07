@@ -434,6 +434,8 @@ button {
 
 .figdev__stage-surface {
   align-items: center;
+  /* stretched flex item + aspect-ratio: width fills the column, height follows the ratio */
+  aspect-ratio: 16 / 9;
   background:
     linear-gradient(var(--figdev-color-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--figdev-color-line) 1px, transparent 1px),
@@ -441,12 +443,14 @@ button {
   background-size: 48px 48px;
   border: 1px solid var(--line);
   display: flex;
-  flex: 1;
   justify-content: center;
-  min-height: 440px;
   overflow: hidden;
   position: relative;
   transition: border-color 180ms ease, background-color 180ms ease;
+  
+  @media (width < 640px) {
+    aspect-ratio: 9 / 16;
+  }
 }
 
 .figdev__cable-layer {
@@ -1388,10 +1392,6 @@ h2 {
 
   .figdev__stage {
     min-height: calc(100vh - 18rem);
-  }
-
-  .figdev__stage-surface {
-    min-height: 30rem;
   }
 
   .figdev__stage-surface::before {

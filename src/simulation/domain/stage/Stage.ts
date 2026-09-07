@@ -2,6 +2,8 @@
 // Live Audio Stage Simulator – Base Proto-Object
 // ============================================================
 
+import { DeviceCatalogCategory } from "../../application/catalog/DeviceCatalog";
+
 /** Unique identifier for every device on the stage */
 export type DeviceId = string;
 
@@ -104,7 +106,7 @@ export abstract class StageDevice {
   // ---------- Identity ----------
   readonly id: DeviceId;
   name: string;
-  readonly category: string;          // free-form or use an enum in subclasses
+  readonly category: DeviceCatalogCategory;          // free-form or use an enum in subclasses
   role: DeviceRole;
 
   // ---------- Physical presence on stage ----------
@@ -130,13 +132,14 @@ export abstract class StageDevice {
     id: DeviceId,
     name: string,
     role: DeviceRole,
-    position: StagePosition = { x: 0, y: 0 }
+    position: StagePosition = { x: 0, y: 0 },
+    category: DeviceCatalogCategory = "processors"  // default category, can be overridden in subclasses
   ) {
     this.id = id;
     this.name = name;
     this.role = role;
     this.position = position;
-    this.category = this.constructor.name; // or override in subclass
+    this.category = category;
   }
 
   // ---------- Port helpers ----------

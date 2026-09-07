@@ -2,6 +2,7 @@ import {
   ConnectorType,
   ConnectionState,
   PortDirection,
+  SignalLevel,
 } from '../../Stage'
 import { AudioCable, CableEndpoint } from './AudioCable'
 
@@ -20,8 +21,28 @@ export interface AudioPortLike {
   connector: ConnectorType
   acceptedConnectors?: Array<ConnectorType>
   direction: PortDirection
-  signalLevel?: string
+  signalLevel?: SignalLevel[] | SignalLevel
   state?: ConnectionState
+}
+
+function hasMatchingSignalLevel(
+  port: { signalLevel?: SignalLevel | SignalLevel[] },
+  source: { signalLevel?: SignalLevel | SignalLevel[] }
+): boolean {
+  if (!port.signalLevel || !source.signalLevel) {
+    return false; // or true, depending on your business rules
+  }
+
+  const portLevels = Array.isArray(port.signalLevel)
+    ? port.signalLevel
+    : [port.signalLevel];
+
+  const sourceLevels = Array.isArray(source.signalLevel)
+    ? source.signalLevel
+    : [source.signalLevel];
+
+  // Does the port contain *all* of the source levels?
+  return sourceLevels.every((level) => portLevels.includes(level));
 }
 
 function canReceive(port: AudioPortLike, source: AudioPortLike): boolean {
@@ -30,7 +51,7 @@ function canReceive(port: AudioPortLike, source: AudioPortLike): boolean {
     return false
   }
 
-  return !port.signalLevel || !source.signalLevel || port.signalLevel.includes(source.signalLevel)
+  return hasMatchingSignalLevel(port, source)
 }
 
 function isSourcePort(port: AudioPortLike, other: AudioPortLike): boolean {
