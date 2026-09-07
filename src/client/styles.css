@@ -3,25 +3,30 @@
 :root {
   --figdev-base-color: #1A2B3C;
   --figdev-dark-base: #111411;
-  --figdev-color-background: var(--figdev-dark-base);
+  --figdev-light-base: #ebebeb;
+  /* dark theme values; [data-theme='light'] overrides these three */
+  --figdev-contrast-base: var(--figdev-dark-base);
+  --figdev-ink-mix: white;
+  --figdev-accent-lightness: 0.9;
+  --figdev-color-background: var(--figdev-contrast-base);
   --figdev-color-surface: color-mix(
     in oklab,
     var(--figdev-base-color) 35%,
-    var(--figdev-dark-base)
+    var(--figdev-contrast-base)
   );
   --figdev-color-surface-raised: color-mix(
     in oklab,
     var(--figdev-base-color) 60%,
-    var(--figdev-dark-base)
+    var(--figdev-contrast-base)
   );
   --figdev-color-ink: color-mix(
     in oklab,
-    white 90%,
+    var(--figdev-ink-mix) 90%,
     var(--figdev-base-color)
   );
   --figdev-color-muted: color-mix(
     in oklab,
-    white 48%,
+    var(--figdev-ink-mix) 48%,
     var(--figdev-base-color)
   );
   --figdev-color-line: color-mix(
@@ -31,7 +36,7 @@
   );
   --figdev-color-accent: oklch(
     from var(--figdev-base-color)
-    0.9
+    var(--figdev-accent-lightness)
     0.17
     calc(h - 30)
   );
@@ -40,6 +45,8 @@
     var(--figdev-color-accent) 18%,
     transparent
   );
+  /* accent stays light/vivid in both themes, so text on it stays dark */
+  --figdev-color-on-accent: var(--figdev-dark-base);
   --figdev-color-waveform: color-mix(
     in oklab,
     var(--figdev-base-color) 78%,
@@ -48,7 +55,7 @@
   --figdev-color-track: color-mix(
     in oklab,
     var(--figdev-base-color) 60%,
-    var(--figdev-dark-base)
+    var(--figdev-contrast-base)
   );
   --figdev-color-icon: color-mix(
     in oklab,
@@ -57,7 +64,7 @@
   );
   --figdev-label-background: color-mix(
     in srgb,
-    var(--figdev-dark-base) 78%,
+    var(--figdev-contrast-base) 78%,
     transparent
   );
   --ink: var(--figdev-color-ink);
@@ -73,6 +80,13 @@
   font-family: 'Space Grotesk', sans-serif;
   font-synthesis: none;
   --mono: 'DM Mono', monospace;
+}
+
+:root[data-theme='light'] {
+  --figdev-contrast-base: var(--figdev-light-base);
+  --figdev-ink-mix: black;
+  --figdev-accent-lightness: 0.55;
+  color-scheme: light;
 }
 
 * {
@@ -304,7 +318,8 @@ button {
 }
 
 .figdev__color-preset,
-.figdev__color-picker {
+.figdev__color-picker,
+.figdev__theme-toggle {
   align-items: center;
   background: none;
   border: 0;
@@ -320,8 +335,15 @@ button {
 
 .figdev__color-preset:hover,
 .figdev__color-preset--active,
-.figdev__color-picker:hover {
+.figdev__color-picker:hover,
+.figdev__theme-toggle:hover {
   color: var(--ink);
+}
+
+.figdev__theme-toggle {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.55rem;
 }
 
 .figdev__color-swatch {
@@ -463,9 +485,25 @@ button {
   z-index: 1;
 }
 
+/* raise the whole layer so a hovered cable can be traced over placed devices */
+.figdev__cable-layer:has(.figdev__cable-group:hover, .figdev__cable-group:focus-within) {
+  z-index: 4;
+}
+
+.figdev__cable-group:hover,
+.figdev__cable-group:focus-within {
+  z-index: 1;
+}
+
 .figdev__cable {
   fill: none;
-  filter: drop-shadow(0 0.18rem 0.12rem var(--figdev-dark-base));
+  /* thin dark ring keeps hash-generated hues readable on light and dark stages */
+  filter:
+    drop-shadow(0.55px 0 0 var(--figdev-dark-base))
+    drop-shadow(-0.55px 0 0 var(--figdev-dark-base))
+    drop-shadow(0 0.55px 0 var(--figdev-dark-base))
+    drop-shadow(0 -0.55px 0 var(--figdev-dark-base))
+    drop-shadow(0 0.18rem 0.12rem var(--figdev-dark-base));
   stroke: var(--cable-color, var(--figdev-color-icon));
   stroke-dasharray: 0.8rem 0.55rem;
   stroke-linecap: round;
@@ -517,7 +555,7 @@ button {
 .figdev__cable-control button:hover,
 .figdev__cable-control button:focus-visible {
   background: var(--cable-color, var(--accent));
-  color: var(--figdev-dark-base);
+  color: var(--figdev-color-on-accent);
   outline: none;
 }
 
@@ -632,6 +670,12 @@ button {
   z-index: 2;
 }
 
+.figdev__placed-device:hover,
+.figdev__placed-device:focus-within,
+.figdev__placed-device:active {
+  z-index: 6;
+}
+
 .figdev__placed-device > .figdev__generic-device {
   height: 100%;
   width: 100%;
@@ -716,7 +760,7 @@ button {
   display: flex;
   justify-content: center;
   margin: clamp(0.45rem, 4cqh, 0.8rem) 0 clamp(0.1rem, 1cqh, 0.15rem);
-  position: relative;
+  position: static;
   width: 100%;
 }
 
@@ -735,7 +779,7 @@ button {
   position: absolute;
 }
 
-.figdev__generic-device-ports--inputs {
+.figdev__generic-device-ports--left {
   align-items: flex-start;
   flex-direction: column;
   left: -1.25rem;
@@ -743,7 +787,7 @@ button {
   transform: translateY(-50%);
 }
 
-.figdev__generic-device-ports--outputs {
+.figdev__generic-device-ports--right {
   align-items: flex-end;
   flex-direction: column;
   right: -1.25rem;
@@ -751,7 +795,13 @@ button {
   transform: translateY(-50%);
 }
 
-.figdev__generic-device-ports--bidirectional {
+.figdev__generic-device-ports--top {
+  left: 50%;
+  top: -7px;
+  transform: translateX(-50%);
+}
+
+.figdev__generic-device-ports--bottom {
   bottom: -1.25rem;
   left: 50%;
   transform: translateX(-50%);
@@ -775,15 +825,16 @@ button {
   position: relative;
 }
 
-.figdev__port-wrap--input {
+.figdev__port-wrap--left {
   flex-direction: row;
 }
 
-.figdev__port-wrap--output {
+.figdev__port-wrap--right {
   flex-direction: row-reverse;
 }
 
-.figdev__port-wrap--bidirectional {
+.figdev__port-wrap--top,
+.figdev__port-wrap--bottom {
   flex-direction: column;
 }
 
@@ -798,7 +849,7 @@ button {
 }
 
 .figdev__port-tooltip {
-  background: var(--figdev-dark-base);
+  background: var(--figdev-contrast-base);
   border: 1px solid var(--accent);
   color: var(--ink);
   display: block;
@@ -923,7 +974,7 @@ button {
 .figdev__placed-device-info:hover,
 .figdev__placed-device-info:focus-visible {
   background: var(--accent);
-  color: var(--figdev-dark-base);
+  color: var(--figdev-color-on-accent);
   outline: none;
   transform: scale(1.12);
 }
@@ -948,7 +999,7 @@ button {
 
 .figdev__placed-device-delete:hover {
   background: var(--accent);
-  color: var(--figdev-dark-base);
+  color: var(--figdev-color-on-accent);
 }
 
 .figdev__modal-backdrop {
@@ -1216,7 +1267,7 @@ h2 {
   align-items: center;
   background: var(--accent);
   border-radius: 50%;
-  color: var(--figdev-color-background);
+  color: var(--figdev-color-on-accent);
   display: flex;
   height: 42px;
   justify-content: center;

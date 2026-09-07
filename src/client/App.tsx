@@ -8,9 +8,11 @@ import {
   KeyboardMusic,
   Maximize2,
   MicVocal,
+  Moon,
   SlidersHorizontal,
   Pin,
   Speaker,
+  Sun,
   Trash2,
   X,
 } from 'lucide-react'
@@ -26,6 +28,7 @@ const tracks = [
 ]
 
 const COLOR_STORAGE_KEY = 'figdev-base-color'
+const THEME_STORAGE_KEY = 'figdev-theme'
 const COLOR_PRESETS = [
   { name: 'Captain Bluebeard', value: '#1A2B3C' },
   { name: 'Moss Boss', value: '#232C22' },
@@ -48,6 +51,8 @@ type PlacedCable = {
   id: string
   from: CableEndpoint
   to: CableEndpoint
+  fromDir?: Point
+  toDir?: Point
 }
 
 type CableDraft = {
@@ -249,21 +254,172 @@ function segmentsHitRect(points: Point[], rect: Rect, padding = 12): boolean {
   })
 }
 
-function createOrthogonalPath(start: Point, end: Point, obstacles: Rect[], width: number, height: number): string {
-  const middleX = (start.x + end.x) / 2
-  const middleY = (start.y + end.y) / 2
-  const candidates = [
-    [start, { x: middleX, y: start.y }, { x: middleX, y: end.y }, end],
-    [start, { x: start.x, y: middleY }, { x: end.x, y: middleY }, end],
-    [start, { x: start.x, y: 24 }, { x: end.x, y: 24 }, end],
-    [start, { x: start.x, y: height - 24 }, { x: end.x, y: height - 24 }, end],
-    [start, { x: 24, y: start.y }, { x: 24, y: end.y }, end],
-    [start, { x: width - 24, y: start.y }, { x: width - 24, y: end.y }, end],
-  ]
-  const route = candidates.find((candidate) => !obstacles.some((obstacle) => segmentsHitRect(candidate, obstacle))) ?? candidates[0]
+// outward normal a cable must leave/enter along, derived from the port's actual
+// position on the device rect (not its electrical direction), so it never dives
+// back under the device regardless of which side a device places its ports on
+function outwardDirectionFromRect(portCenter: Point, deviceRect: Rect): Point {
+  const centerX = (deviceRect.left + deviceRect.right) / 2
+  const centerY = (deviceRect.top + deviceRect.bottom) / 2
+  const halfWidth = (deviceRect.right - deviceRect.left) / 2 || 1
+  const halfHeight = (deviceRect.bottom - deviceRect.top) / 2 || 1
+  const nx = (portCenter.x - centerX) / halfWidth
+  const ny = (portCenter.y - centerY) / halfHeight
 
+  return Math.abs(nx) >= Math.abs(ny)
+    ? { x: nx >= 0 ? 1 : -1, y: 0 }
+    : { x: 0, y: ny >= 0 ? 1 : -1 }
+}
+
+const CABLE_STUB = 20
+
+function dedupePoints(points: Point[]): Point[] {
+  return points.filter((point, index) => (
+    index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y
+  ))
+}
+
+/**
+ * Routes a cable so it always leaves/enters perpendicular to its ports: a short
+ * straight stub clears the device, then the path turns as many times as needed.
+ */
+function createCablePath(
+  start: Point,
+  startDir: Point,
+  end: Point,
+  endDir: Point | null,
+  obstacles: Rect[],
+  width: number,
+  height: number,
+  startDeviceId: string | null = null,
+  endDeviceId: string | null = null,
+): string {
+  // Always build explicit perpendicular stubs first
+  const stubStart = { x: start.x + startDir.x * CABLE_STUB, y: start.y + startDir.y * CABLE_STUB }
+  const stubEnd = endDir ? { x: end.x + endDir.x * CABLE_STUB, y: end.y + endDir.y * CABLE_STUB } : end
+
+  // Move stubs just outside their device rectangles if possible
+  const padding = 8
+  const startObstacle = startDeviceId ? obstacles.find((o) => o.deviceInstanceId === startDeviceId) : undefined
+  if (startObstacle) {
+    const expanded = { left: startObstacle.left - padding, top: startObstacle.top - padding, right: startObstacle.right + padding, bottom: startObstacle.bottom + padding }
+    if (startDir.x > 0) stubStart.x = Math.max(stubStart.x, expanded.right)
+    if (startDir.x < 0) stubStart.x = Math.min(stubStart.x, expanded.left)
+    if (startDir.y > 0) stubStart.y = Math.max(stubStart.y, expanded.bottom)
+    if (startDir.y < 0) stubStart.y = Math.min(stubStart.y, expanded.top)
+  }
+  const endObstacle = endDeviceId ? obstacles.find((o) => o.deviceInstanceId === endDeviceId) : undefined
+  if (endObstacle && endDir) {
+    const expanded = { left: endObstacle.left - padding, top: endObstacle.top - padding, right: endObstacle.right + padding, bottom: endObstacle.bottom + padding }
+    if (endDir.x > 0) stubEnd.x = Math.max(stubEnd.x, expanded.right)
+    if (endDir.x < 0) stubEnd.x = Math.min(stubEnd.x, expanded.left)
+    if (endDir.y > 0) stubEnd.y = Math.max(stubEnd.y, expanded.bottom)
+    if (endDir.y < 0) stubEnd.y = Math.min(stubEnd.y, expanded.top)
+  }
+
+  // Grid-based A* router (4-connected Manhattan) on coarse grid to avoid obstacles reliably
+  const cellSize = 8
+  const cols = Math.max(3, Math.ceil(width / cellSize))
+  const rows = Math.max(3, Math.ceil(height / cellSize))
+
+  const toCell = (p: Point) => ({ x: Math.max(0, Math.min(cols - 1, Math.floor(p.x / cellSize))), y: Math.max(0, Math.min(rows - 1, Math.floor(p.y / cellSize))) })
+  const toPointCenter = (c: { x: number; y: number }) => ({ x: c.x * cellSize + cellSize / 2, y: c.y * cellSize + cellSize / 2 })
+
+  const blocked = new Array(rows).fill(0).map(() => new Array(cols).fill(false))
+  const pad = 6
+  for (const obs of obstacles) {
+    const left = Math.max(0, Math.floor((obs.left - pad) / cellSize))
+    const right = Math.min(cols - 1, Math.floor((obs.right + pad) / cellSize))
+    const top = Math.max(0, Math.floor((obs.top - pad) / cellSize))
+    const bottom = Math.min(rows - 1, Math.floor((obs.bottom + pad) / cellSize))
+    for (let r = top; r <= bottom; r++) for (let c = left; c <= right; c++) blocked[r][c] = true
+  }
+
+  const startCell = toCell(stubStart)
+  const endCell = toCell(stubEnd)
+
+  // Ensure stub cells are not blocked; if they are, nudge them outward along stub direction
+  const nudge = (cell: { x: number; y: number }, dir: Point) => {
+    let cx = cell.x, cy = cell.y
+    for (let i = 0; i < 6 && blocked[cy] && blocked[cy][cx]; i++) {
+      cx = Math.max(0, Math.min(cols - 1, cx + Math.sign(dir.x)))
+      cy = Math.max(0, Math.min(rows - 1, cy + Math.sign(dir.y)))
+    }
+    return { x: cx, y: cy }
+  }
+
+  const sCell = nudge(startCell, startDir)
+  const eCell = endDir ? nudge(endCell, endDir) : endCell
+
+  function astar(s: { x: number; y: number }, t: { x: number; y: number }) {
+    const key = (p: { x: number; y: number }) => `${p.x},${p.y}`
+    const open = new Map<string, { x: number; y: number }>()
+    const came = new Map<string, string>()
+    const gscore = new Map<string, number>()
+    const fscore = new Map<string, number>()
+    const h = (p: { x: number; y: number }) => Math.abs(p.x - t.x) + Math.abs(p.y - t.y)
+    open.set(key(s), s)
+    gscore.set(key(s), 0)
+    fscore.set(key(s), h(s))
+
+    while (open.size) {
+      // pop lowest fscore
+      let currentKey: string | null = null
+      let current: { x: number; y: number } | null = null
+      let best = Infinity
+      for (const [k, v] of open) {
+        const f = fscore.get(k) ?? Infinity
+        if (f < best) { best = f; currentKey = k; current = v }
+      }
+      if (!current || !currentKey) break
+      if (current.x === t.x && current.y === t.y) {
+        // reconstruct
+        const path: { x: number; y: number }[] = []
+        let k = currentKey
+        while (k) {
+          const [cx, cy] = k.split(',').map(Number)
+          path.push({ x: cx, y: cy })
+          k = came.get(k) ?? ''
+        }
+        return path.reverse()
+      }
+
+      open.delete(currentKey)
+      const neighbors = [ { x: current.x + 1, y: current.y }, { x: current.x - 1, y: current.y }, { x: current.x, y: current.y + 1 }, { x: current.x, y: current.y - 1 } ]
+      for (const n of neighbors) {
+        if (n.x < 0 || n.x >= cols || n.y < 0 || n.y >= rows) continue
+        if (blocked[n.y][n.x] && !(n.x === t.x && n.y === t.y)) continue
+        const nk = key(n)
+        const tentative = (gscore.get(currentKey) ?? Infinity) + 1
+        if (tentative < (gscore.get(nk) ?? Infinity)) {
+          came.set(nk, currentKey)
+          gscore.set(nk, tentative)
+          fscore.set(nk, tentative + h(n))
+          open.set(nk, n)
+        }
+      }
+    }
+    return null
+  }
+
+  const gridPath = astar(sCell, eCell)
+  if (gridPath && gridPath.length > 0) {
+    // convert grid centers to points and compress orthogonal turns
+    const pts = gridPath.map(toPointCenter)
+    const routePoints: Point[] = [start, stubStart, ...pts, stubEnd, end]
+    const compressed: Point[] = dedupePoints(routePoints).filter(Boolean)
+    return compressed.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+  }
+
+  // fallback to earlier simple bending candidates if grid router fails
+  const middleX = (stubStart.x + stubEnd.x) / 2
+  const middleY = (stubStart.y + stubEnd.y) / 2
+  const aligned = stubStart.x === stubEnd.x || stubStart.y === stubEnd.y
+  const bendCandidates: Point[][] = aligned ? [[]] : [ [{ x: middleX, y: stubStart.y }, { x: middleX, y: stubEnd.y }], [{ x: stubStart.x, y: middleY }, { x: stubEnd.x, y: middleY }], [{ x: stubStart.x, y: 24 }, { x: stubEnd.x, y: 24 }], [{ x: stubStart.x, y: height - 24 }, { x: stubEnd.x, y: height - 24 }], [{ x: 24, y: stubStart.y }, { x: 24, y: stubEnd.y }], [{ x: width - 24, y: stubStart.y }, { x: width - 24, y: stubEnd.y }] ]
+  const candidatePaths = bendCandidates.map((bend) => dedupePoints([start, stubStart, ...bend, stubEnd, end]))
+  const route = candidatePaths.find((candidate) => !obstacles.some((obstacle) => segmentsHitRect(candidate, obstacle))) ?? candidatePaths[0]
   return route.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
 }
+
 
 function cableColor(endpoint: CableEndpoint): string {
   const value = `${endpoint.deviceInstanceId}:${endpoint.portId}`.split('').reduce(
@@ -316,15 +472,41 @@ function CableLayer({
         deviceInstanceId: device.instanceId,
       }
     }).filter((obstacle): obstacle is Rect => obstacle !== null)
+    const getPortDirection = (endpoint: CableEndpoint): Point => {
+      // Compute the actual port center and derive the outward normal from the
+      // device rectangle. This is more robust than relying on CSS classnames.
+      const portEl = stage.querySelector<HTMLElement>(`[data-device-instance="${endpoint.deviceInstanceId}"][data-port-id="${endpoint.portId}"]`)
+      if (portEl) {
+        const portBounds = portEl.getBoundingClientRect()
+        const portCenter = { x: portBounds.left + portBounds.width / 2 - stageBounds.left, y: portBounds.top + portBounds.height / 2 - stageBounds.top }
+        const deviceRect = obstacles.find((item) => item.deviceInstanceId === endpoint.deviceInstanceId)
+        if (deviceRect) return outwardDirectionFromRect(portCenter, deviceRect)
+      }
 
-    const nextPaths: CablePath[] = cables.flatMap((cable) => {
+      const point = getPoint(endpoint)
+      const deviceRect = obstacles.find((item) => item.deviceInstanceId === endpoint.deviceInstanceId)
+      return point && deviceRect ? outwardDirectionFromRect(point, deviceRect) : { x: 1, y: 0 }
+    }
+
+      const nextPaths: CablePath[] = cables.flatMap((cable) => {
       const start = getPoint(cable.from)
       const end = getPoint(cable.to)
       if (!start || !end) return []
-      const cableObstacles = obstacles.filter((obstacle) => ![cable.from.deviceInstanceId, cable.to.deviceInstanceId].includes(obstacle.deviceInstanceId))
+      const cableObstacles = obstacles
       return [{
         id: cable.id,
-        path: createOrthogonalPath(start, end, cableObstacles, stageBounds.width, stageBounds.height),
+        path: createCablePath(
+          start,
+          // prefer stored directions on the placed cable so stubs are stable
+          cable.fromDir ?? getPortDirection(cable.from),
+          end,
+          cable.toDir ?? getPortDirection(cable.to),
+          cableObstacles,
+          stageBounds.width,
+          stageBounds.height,
+          cable.from.deviceInstanceId,
+          cable.to.deviceInstanceId,
+        ),
         anchor: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
         color: cableColor(cable.from),
       }]
@@ -335,7 +517,17 @@ function CableLayer({
       if (start) {
         nextPaths.push({
           id: 'draft',
-          path: createOrthogonalPath(start, draft.pointer, obstacles.filter((obstacle) => obstacle.deviceInstanceId !== draft.from.deviceInstanceId), stageBounds.width, stageBounds.height),
+          path: createCablePath(
+            start,
+            getPortDirection(draft.from),
+            draft.pointer,
+            null,
+            obstacles,
+            stageBounds.width,
+            stageBounds.height,
+            draft.from.deviceInstanceId,
+            null,
+          ),
           anchor: draft.pointer,
           color: undefined,
         })
@@ -364,6 +556,19 @@ function CableLayer({
   )
 }
 
+type PortSide = 'left' | 'right' | 'top' | 'bottom'
+
+// where each port type is drawn on the device rectangle; Mixer flips the usual left/right layout
+function getPortSide(deviceName: string, direction: string): PortSide {
+  if (deviceName === 'Mixer') {
+    if (direction === 'output') return 'top'
+    return 'bottom'
+  }
+  if (direction === 'output') return 'right'
+  if (direction === 'input') return 'left'
+  return 'bottom'
+}
+
 function GenericDeviceGraphic({
   device,
   deviceInstanceId = device.id,
@@ -378,11 +583,13 @@ function GenericDeviceGraphic({
   onPortPointerUp: (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => void
 }) {
   const physicalPorts = device.physicalPorts ?? device.ports
-  const inputs = physicalPorts.filter((port) => port.direction === 'input')
-  const outputs = physicalPorts.filter((port) => port.direction === 'output')
-  const bidirectional = physicalPorts.filter((port) => port.direction === 'bidirectional')
+  const portsBySide: Record<PortSide, typeof physicalPorts> = { left: [], right: [], top: [], bottom: [] }
+  physicalPorts.forEach((port) => {
+    portsBySide[getPortSide(device.name, port.direction)].push(port)
+  })
 
-  const renderPort = (port: typeof physicalPorts[number], type: 'input' | 'output' | 'bidirectional') => {
+  const renderPort = (port: typeof physicalPorts[number], side: PortSide) => {
+    const type = port.direction
     const isSource = cableDraft?.from.deviceInstanceId === deviceInstanceId && cableDraft.from.portId === port.id
     const isTarget = Boolean(cableDraft && !isSource && canConnectAudioPorts(
       { ...cableDraft.sourcePort, deviceId: cableDraft.from.deviceInstanceId },
@@ -391,7 +598,7 @@ function GenericDeviceGraphic({
 
     return (
     <button
-      className={`figdev__port-wrap figdev__port-wrap--${type} ${isSource ? 'figdev__port-wrap--active' : ''} ${isTarget ? 'figdev__port-wrap--target' : ''}`}
+      className={`figdev__port-wrap figdev__port-wrap--${side} ${isSource ? 'figdev__port-wrap--active' : ''} ${isTarget ? 'figdev__port-wrap--target' : ''}`}
       data-port-id={port.id}
       data-device-instance={deviceInstanceId}
       key={`${type}-${port.name}`}
@@ -413,14 +620,17 @@ function GenericDeviceGraphic({
       <DeviceIconCard device={device} />
       <strong className="figdev__generic-device-name">{device.name}</strong>
       <span className="figdev__generic-device-body">
-        {inputs.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--inputs">
-          {inputs.map((port) => renderPort(port, 'input'))}
+        {portsBySide.left.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--left">
+          {portsBySide.left.map((port) => renderPort(port, 'left'))}
         </span>}
-        {bidirectional.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--bidirectional">
-          {bidirectional.map((port) => renderPort(port, 'bidirectional'))}
+        {portsBySide.top.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--top">
+          {portsBySide.top.map((port) => renderPort(port, 'top'))}
         </span>}
-        {outputs.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--outputs">
-          {outputs.map((port) => renderPort(port, 'output'))}
+        {portsBySide.bottom.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--bottom">
+          {portsBySide.bottom.map((port) => renderPort(port, 'bottom'))}
+        </span>}
+        {portsBySide.right.length > 0 && <span className="figdev__generic-device-ports figdev__generic-device-ports--right">
+          {portsBySide.right.map((port) => renderPort(port, 'right'))}
         </span>}
       </span>
       <small>{physicalPorts.length} physical port{physicalPorts.length === 1 ? '' : 's'}</small>
@@ -592,12 +802,16 @@ function DeviceAccordion({
 function SettingsPanel({
   baseColor,
   onColorChange,
+  theme,
+  onThemeChange,
   isOpen,
   isPinned,
   onToggle,
 }: {
   baseColor: string
   onColorChange: (color: string) => void
+  theme: 'dark' | 'light'
+  onThemeChange: (theme: 'dark' | 'light') => void
   isOpen: boolean
   isPinned: boolean
   onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void
@@ -639,6 +853,14 @@ function SettingsPanel({
       </button>
       <div className="figdev__settings-content" ref={content}>
         <div className="figdev__settings-options">
+          <button
+            className="figdev__theme-toggle"
+            type="button"
+            onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? <Moon size={13} strokeWidth={2} /> : <Sun size={13} strokeWidth={2} />}
+            <span>{theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
+          </button>
           {COLOR_PRESETS.map((preset) => (
             <button
               className={`figdev__color-preset ${baseColor.toUpperCase() === preset.value ? 'figdev__color-preset--active' : ''}`}
@@ -682,11 +904,19 @@ function App() {
   const [baseColor, setBaseColor] = useState(() => (
     localStorage.getItem(COLOR_STORAGE_KEY) ?? COLOR_PRESETS[0].value
   ))
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => (
+    localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark'
+  ))
 
   useEffect(() => {
     document.documentElement.style.setProperty('--figdev-base-color', baseColor)
     localStorage.setItem(COLOR_STORAGE_KEY, baseColor)
   }, [baseColor])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
 
   useEffect(() => {
     fetch('/api/devices')
@@ -802,10 +1032,40 @@ function App() {
     }
 
     if (!endpointIsUsed && canConnectAudioPorts(source, { ...port, deviceId: device.id })) {
+      // capture the current stub directions so they remain stable even if
+      // devices move later. Use the rendered port element's side class when
+      // available, otherwise fall back to geometric outward normal.
+      const resolvePortDirectionInApp = (endpoint: CableEndpoint): Point => {
+        const stage = stageSurface.current
+        if (!stage) return { x: 1, y: 0 }
+        const portEl = stage.querySelector<HTMLElement>(`[data-device-instance="${endpoint.deviceInstanceId}"][data-port-id="${endpoint.portId}"]`)
+        if (portEl) {
+          const portBounds = portEl.getBoundingClientRect()
+          const stageBounds = stage.getBoundingClientRect()
+          const portCenter = { x: portBounds.left + portBounds.width / 2 - stageBounds.left, y: portBounds.top + portBounds.height / 2 - stageBounds.top }
+          const deviceEl = stage.querySelector<HTMLElement>(`[data-device-instance="${endpoint.deviceInstanceId}"]`)
+          if (deviceEl) {
+            const bounds = deviceEl.getBoundingClientRect()
+            const deviceRect: Rect = { left: bounds.left - stageBounds.left, top: bounds.top - stageBounds.top, right: bounds.right - stageBounds.left, bottom: bounds.bottom - stageBounds.top, deviceInstanceId: endpoint.deviceInstanceId }
+            return outwardDirectionFromRect(portCenter, deviceRect)
+          }
+        }
+
+        const deviceEl = stage.querySelector<HTMLElement>(`[data-device-instance="${endpoint.deviceInstanceId}"]`)
+        if (!deviceEl) return { x: 1, y: 0 }
+        const bounds = deviceEl.getBoundingClientRect()
+        const stageBounds = stage.getBoundingClientRect()
+        const point = { x: bounds.left + bounds.width / 2 - stageBounds.left, y: bounds.top + bounds.height / 2 - stageBounds.top }
+        const deviceRect: Rect = { left: bounds.left - stageBounds.left, top: bounds.top - stageBounds.top, right: bounds.right - stageBounds.left, bottom: bounds.bottom - stageBounds.top, deviceInstanceId: endpoint.deviceInstanceId }
+        return outwardDirectionFromRect(point, deviceRect)
+      }
+
       setCables((current) => [...current, {
         id: `cable-${Date.now()}`,
         from: cableDraft.from,
         to: target,
+        fromDir: resolvePortDirectionInApp(cableDraft.from),
+        toDir: resolvePortDirectionInApp(target),
       }])
     }
 
@@ -852,7 +1112,7 @@ function App() {
             </p>
           )}
         </div>
-        <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} isOpen={isAccordionOpen('settings')} isPinned={pinnedAccordions.includes('settings')} onToggle={(event) => toggleAccordion('settings', event)} />
+        <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} theme={theme} onThemeChange={setTheme} isOpen={isAccordionOpen('settings')} isPinned={pinnedAccordions.includes('settings')} onToggle={(event) => toggleAccordion('settings', event)} />
         <p className="figdev__sidebar-footer">Build 0.1 / browser audio lab</p>
       </aside>
 
