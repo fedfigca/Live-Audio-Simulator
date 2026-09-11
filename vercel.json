@@ -1,11 +1,11 @@
 {
   "version": 2,
   "builds": [
-    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist", "buildCommand": "npm run build" } },
-    { "src": "src/index.ts", "use": "@vercel/node", "config": { "includeFiles": ["src/**", "simulation/**"] } }
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist", "buildCommand": "npm run build && mkdir -p server && cp dist/index.js server/index.js" } },
+    { "src": "server/index.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/src/index.ts" }
+    { "src": "/.*", "dest": "/server/index.js" }
   ]
 }
