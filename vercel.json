@@ -9,10 +9,5 @@
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "src/index.ts": {
-      "maxDuration": 15
-    }
-  }
+  ]
 }
