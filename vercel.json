@@ -2,12 +2,10 @@
   "version": 2,
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist", "buildCommand": "npm run build" } },
-    { "src": "dist/index.js", "use": "@vercel/node" },
-    { "src": "dist/static/**", "use": "@vercel/static" }
+    { "src": "src/index.ts", "use": "@vercel/node", "config": { "includeFiles": ["src/**", "simulation/**"] } }
   ],
   "routes": [
-    { "src": "/static/(.*)", "dest": "/dist/static/$1" },
-    { "src": "\/(.*\\.(js|css|png|jpg|svg|ico))", "dest": "/dist/static/$1" },
-    { "src": "/.*", "dest": "/dist/index.js" }
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/src/index.ts" }
   ]
 }
