@@ -7,15 +7,17 @@ export default defineConfig(({ command, mode }) => {
   if (mode === 'client') {
     return {
       plugins: [react()],
+      publicDir: false,
       build: {
         emptyOutDir: false,
+        copyPublicDir: false,
         rollupOptions: {
           input: 'src/client/main.tsx',
           output: {
             assetFileNames: 'static/assets/[name][extname]',
             chunkFileNames: 'static/assets/[name]-[hash].js',
             entryFileNames: 'static/client.js',
-            dir: 'dist',
+            dir: 'public',
           },
         },
       },
