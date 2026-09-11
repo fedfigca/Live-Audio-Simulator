@@ -1,16 +1,6 @@
 {
   "version": 3,
-  "builds": [
-    {
-      "src": "src/index.ts",
-      "use": "@vercel/node",
-      "config": { "maxLambdaSize": "50mb" }
-    },
-    {
-      "src": "dist/static/**",
-      "use": "@vercel/static"
-    }
-  ],
+  
   "routes": [
     { "src": "/static/(.*)", "dest": "/dist/static/$1" },
     { "src": "/(.*\\.(js|css|png|jpg|svg|ico))", "dest": "/dist/static/$1" },
