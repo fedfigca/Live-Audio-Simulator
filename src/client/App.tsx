@@ -1115,7 +1115,7 @@ function App() {
           )}
         </div>
         <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} theme={theme} onThemeChange={setTheme} isOpen={isAccordionOpen('settings')} isPinned={pinnedAccordions.includes('settings')} onToggle={(event) => toggleAccordion('settings', event)} />
-        <p className="figdev__sidebar-footer">Build 0.1 / browser audio lab</p>
+        <p className="figdev__sidebar-footer">Build 0.1.0</p>
       </aside>
 
       <main className="figdev__main" id="studio">
