@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import useDraggable from './hooks/useDraggable'
 import type { LucideIcon } from 'lucide-react'
 import type { DeviceCatalog, DeviceSummary } from '../simulation/application/catalog/DeviceCatalog'
 import DeviceFullInfo from './DeviceFullInfo'
@@ -728,11 +729,41 @@ function PlacedDeviceGraphic({
 
 type AccordionKey = 'sources' | 'outputs' | 'processors' | 'settings'
 
+// Small helper component so each device can attach hooks safely
+function DeviceItem({
+  device,
+  onDeviceClick,
+  onDeviceDragStart,
+  onDevicePointerDrop,
+}: {
+  device: DeviceSummary
+  onDeviceClick: (device: DeviceSummary) => void
+  onDeviceDragStart: (device: DeviceSummary, event: React.DragEvent<HTMLButtonElement>) => void
+  onDevicePointerDrop: (device: DeviceSummary, clientX: number, clientY: number) => void
+}) {
+  const dragHandlers = useDraggable(device, { longPress: 220, onDrop: (d, x, y) => onDevicePointerDrop(d, x, y) })
+
+  return (
+    <button
+      className="figdev__device"
+      type="button"
+      draggable
+      onClick={() => onDeviceClick(device)}
+      onDragStart={(event) => onDeviceDragStart(device, event)}
+      {...dragHandlers}
+    >
+      <strong>{device.name}</strong>
+      <small>{formatPortSummary(device)}</small>
+    </button>
+  )
+}
+
 function DeviceAccordion({
   title,
   devices,
   onDeviceClick,
   onDeviceDragStart,
+  onDevicePointerDrop,
   isOpen,
   isPinned,
   onToggle,
@@ -741,6 +772,7 @@ function DeviceAccordion({
   devices: DeviceSummary[]
   onDeviceClick: (device: DeviceSummary) => void
   onDeviceDragStart: (device: DeviceSummary, event: React.DragEvent<HTMLButtonElement>) => void
+  onDevicePointerDrop: (device: DeviceSummary, clientX: number, clientY: number) => void
   isOpen: boolean
   isPinned: boolean
   onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void
@@ -783,17 +815,13 @@ function DeviceAccordion({
       <div className="figdev__device-group-content" ref={content}>
         <div className="figdev__device-list">
           {devices.map((device) => (
-            <button
-              className="figdev__device"
+            <DeviceItem
               key={device.id}
-              type="button"
-              draggable
-              onClick={() => onDeviceClick(device)}
-              onDragStart={(event) => onDeviceDragStart(device, event)}
-            >
-              <strong>{device.name}</strong>
-              <small>{formatPortSummary(device)}</small>
-            </button>
+              device={device}
+              onDeviceClick={onDeviceClick}
+              onDeviceDragStart={onDeviceDragStart}
+              onDevicePointerDrop={onDevicePointerDrop}
+            />
           ))}
         </div>
       </div>
@@ -901,6 +929,7 @@ function App() {
   const [cableDraft, setCableDraft] = useState<CableDraft | null>(null)
   const [isStageDragOver, setIsStageDragOver] = useState(false)
   const stageSurface = useRef<HTMLDivElement>(null)
+  const [dragPreview, setDragPreview] = useState<{ device: DeviceSummary; x: number; y: number; width: number; height: number } | null>(null)
   const [openAccordion, setOpenAccordion] = useState<AccordionKey | null>(null)
   const [pinnedAccordions, setPinnedAccordions] = useState<AccordionKey[]>([])
   const [baseColor, setBaseColor] = useState(() => (
@@ -930,6 +959,59 @@ function App() {
       .catch(() => setCatalogError(true))
   }, [])
 
+  // Listen for custom drag events from `useDraggable` so the stage highlights on touch drags
+  useEffect(() => {
+    let prevTouchAction: string | null = null
+
+    const onDragMove = (ev: Event) => {
+      const detail = (ev as CustomEvent)?.detail
+      if (!detail || !stageSurface.current) return
+      const { clientX, clientY, payload } = detail
+      const bounds = stageSurface.current.getBoundingClientRect()
+      const inside = clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom
+      setIsStageDragOver(inside)
+
+      // compute preview placement in percent
+      try {
+        const dev = payload as DeviceSummary
+        const defaultSize = getDefaultDeviceSize(dev)
+        const dropX = ((clientX - bounds.left) / bounds.width) * 100
+        const dropY = ((clientY - bounds.top) / bounds.height) * 100
+        const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
+        const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
+        setDragPreview({ device: dev, x, y, width: defaultSize.width, height: defaultSize.height })
+      } catch (e) {
+        setDragPreview(null)
+      }
+    }
+
+    const onDragStart = (ev: Event) => {
+      // prevent passive touch scrolling on the stage while dragging
+      if (stageSurface.current) {
+        prevTouchAction = stageSurface.current.style.touchAction ?? ''
+        stageSurface.current.style.touchAction = 'none'
+      }
+      onDragMove(ev)
+    }
+
+    const onDragEnd = () => {
+      setIsStageDragOver(false)
+      setDragPreview(null)
+      if (stageSurface.current) stageSurface.current.style.touchAction = ''
+    }
+
+    window.addEventListener('figdev-dragmove', onDragMove as EventListener)
+    window.addEventListener('figdev-dragstart', onDragStart as EventListener)
+    window.addEventListener('figdev-dragend', onDragEnd as EventListener)
+
+    return () => {
+      window.removeEventListener('figdev-dragmove', onDragMove as EventListener)
+      window.removeEventListener('figdev-dragstart', onDragStart as EventListener)
+      window.removeEventListener('figdev-dragend', onDragEnd as EventListener)
+      if (stageSurface.current) stageSurface.current.style.touchAction = prevTouchAction ?? ''
+    }
+  }, [stageSurface])
+
   useGSAP(
     () => {
       gsap.from('.figdev__reveal', {
@@ -953,25 +1035,8 @@ function App() {
 
     if (!device) return
 
-    const defaultSize = getDefaultDeviceSize(device)
-    const bounds = stageSurface.current?.getBoundingClientRect()
-    // center the device on the pointer's release position, in percent of the stage surface
-    const dropX = bounds ? ((event.clientX - bounds.left) / bounds.width) * 100 : 8
-    const dropY = bounds ? ((event.clientY - bounds.top) / bounds.height) * 100 : 12
-    const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
-    const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
-
-    setPlacedDevices((current) => [
-      ...current,
-      {
-        ...device,
-        instanceId: `${device.id}-${Date.now()}`,
-        x,
-        y,
-        width: defaultSize.width,
-        height: defaultSize.height,
-      },
-    ])
+    // place using shared helper (works for drag events and touch/pointer fallbacks)
+    placeDeviceAt(device, event.clientX, event.clientY)
   }
 
   const updatePlacedDevice = (instanceId: string, updates: Partial<PlacedDevice>) => {
@@ -1004,6 +1069,28 @@ function App() {
     const bounds = stageSurface.current?.getBoundingClientRect()
     if (!bounds) return { x: event.clientX, y: event.clientY }
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
+  }
+
+  // Place a device on the stage given client coordinates (shared for native drag and touch fallbacks)
+  const placeDeviceAt = (device: DeviceSummary, clientX: number, clientY: number) => {
+    const defaultSize = getDefaultDeviceSize(device)
+    const bounds = stageSurface.current?.getBoundingClientRect()
+    const dropX = bounds ? ((clientX - bounds.left) / bounds.width) * 100 : 8
+    const dropY = bounds ? ((clientY - bounds.top) / bounds.height) * 100 : 12
+    const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
+    const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
+
+    setPlacedDevices((current) => [
+      ...current,
+      {
+        ...device,
+        instanceId: `${device.id}-${Date.now()}`,
+        x,
+        y,
+        width: defaultSize.width,
+        height: defaultSize.height,
+      },
+    ])
   }
 
   const beginCable = (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => {
@@ -1098,15 +1185,15 @@ function App() {
               <DeviceAccordion title="Sources" devices={catalog.sources} isOpen={isAccordionOpen('sources')} isPinned={pinnedAccordions.includes('sources')} onToggle={(event) => toggleAccordion('sources', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
-              }} />
+              }} onDevicePointerDrop={placeDeviceAt} />
               <DeviceAccordion title="Outputs" devices={catalog.outputs} isOpen={isAccordionOpen('outputs')} isPinned={pinnedAccordions.includes('outputs')} onToggle={(event) => toggleAccordion('outputs', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
-              }} />
+              }} onDevicePointerDrop={placeDeviceAt} />
               <DeviceAccordion title="Process devices" devices={catalog.processors} isOpen={isAccordionOpen('processors')} isPinned={pinnedAccordions.includes('processors')} onToggle={(event) => toggleAccordion('processors', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
-              }} />
+              }} onDevicePointerDrop={placeDeviceAt} />
             </>
           ) : (
             <p className="figdev__device-browser-status">
@@ -1146,6 +1233,23 @@ function App() {
               stageRef={stageSurface}
               onDeleteCable={(cableId) => setCables((current) => current.filter((cable) => cable.id !== cableId))}
             />
+            {dragPreview && (
+              <div
+                className="figdev__stage-preview"
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: `${dragPreview.x}%`,
+                  top: `${dragPreview.y}%`,
+                  width: `${dragPreview.width}%`,
+                  height: `${dragPreview.height}%`,
+                  border: '2px dashed rgba(0,0,0,0.18)',
+                  background: 'rgba(0,0,0,0.02)',
+                  pointerEvents: 'none',
+                  zIndex: 50,
+                }}
+              />
+            )}
             {placedDevices.length > 0 ? placedDevices.map((device) => (
               <PlacedDeviceGraphic
                 key={device.instanceId}
