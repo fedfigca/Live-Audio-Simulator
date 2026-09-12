@@ -50,6 +50,10 @@ export default function useDraggable<T>(payload: T, options: { longPress?: numbe
     document.body.appendChild(el)
     ghostRef.current = el
     moveGhost(x, y)
+    // visually hide the originating element to avoid duplicate visuals
+    try {
+      if (capturedElementRef.current) (capturedElementRef.current as HTMLElement).classList.add('figdev__device--dragging')
+    } catch (e) {}
     // announce drag start so other UI (stage) can respond immediately
     try {
       window.dispatchEvent(new CustomEvent('figdev-dragstart', { detail: { payload: payload as any, clientX: x, clientY: y } }))
@@ -75,6 +79,10 @@ export default function useDraggable<T>(payload: T, options: { longPress?: numbe
 
   function destroyGhost() {
     if (ghostRef.current) {
+      // restore originating element's visibility
+      try {
+        if (capturedElementRef.current) (capturedElementRef.current as HTMLElement).classList.remove('figdev__device--dragging')
+      } catch (e) {}
       ghostRef.current.remove()
       ghostRef.current = null
     }
@@ -152,6 +160,11 @@ export default function useDraggable<T>(payload: T, options: { longPress?: numbe
         } catch (e) {}
       }
     }
+    try {
+      if (capturedElementRef.current) (capturedElementRef.current as HTMLElement).classList.remove('figdev__device--dragging')
+    } catch (e) {}
+    capturedElementRef.current = null
+    pointerIdRef.current = null
     // cancel any pending RAF
     if (rafRef.current !== null) {
       try { window.cancelAnimationFrame(rafRef.current) } catch (e) {}
@@ -201,6 +214,9 @@ export default function useDraggable<T>(payload: T, options: { longPress?: numbe
         capturedElementRef.current.releasePointerCapture(pointerIdRef.current)
       }
     } catch (e) {}
+    try {
+      if (capturedElementRef.current) (capturedElementRef.current as HTMLElement).classList.remove('figdev__device--dragging')
+    } catch (e) {}
     capturedElementRef.current = null
     pointerIdRef.current = null
   }, [])
@@ -208,6 +224,10 @@ export default function useDraggable<T>(payload: T, options: { longPress?: numbe
   const startTouch = useCallback((ev: React.TouchEvent) => {
     const t = ev.touches && ev.touches[0]
     if (!t) return
+    // remember originating element so we can hide it when the ghost appears
+    try {
+      capturedElementRef.current = ev.currentTarget as Element
+    } catch (e) {}
     startXRef.current = t.clientX
     startYRef.current = t.clientY
     timerRef.current = window.setTimeout(() => {

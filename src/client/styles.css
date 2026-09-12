@@ -401,6 +401,32 @@ button {
   color: var(--muted);
 }
 
+/* Drag preview (compact icon + name) */
+.figdev__stage-preview {
+  box-sizing: border-box;
+}
+
+.figdev__preview-inner {
+  color: var(--figdev-color-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.figdev__preview-icon {
+  color: var(--figdev-color-icon);
+}
+
+.figdev__preview-name {
+  color: var(--figdev-color-ink);
+  white-space: nowrap;
+}
+
+/* Hide the original device element while dragging to avoid double-visuals */
+.figdev__device--dragging {
+  opacity: 0 !important;
+}
+
 .figdev__sidebar-footer {
   color: var(--muted);
   font-family: var(--mono);
@@ -616,6 +642,34 @@ button {
 
 .figdev__stage--drag-over .figdev__stage-surface {
   border-color: var(--accent);
+}
+
+/* Stronger visual when dragging is active but not yet over the stage */
+.figdev__dragging-outside .figdev__stage-surface {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  box-shadow: 0 20px 50px rgba(0,0,0,0.44);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.01), rgba(255,255,255,0.01)),
+    linear-gradient(var(--figdev-color-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--figdev-color-line) 1px, transparent 1px),
+    var(--figdev-color-surface);
+}
+
+.figdev__dragging-outside .figdev__stage-surface::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 8px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  pointer-events: none;
+}
+
+.figdev__dragging-outside .figdev__sidebar {
+  opacity: 0.7;
+}
+
+.figdev__dragging-outside .figdev__topbar {
+  opacity: 0.7;
 }
 
 .figdev__stage-label {

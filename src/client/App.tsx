@@ -929,7 +929,18 @@ function App() {
   const [cableDraft, setCableDraft] = useState<CableDraft | null>(null)
   const [isStageDragOver, setIsStageDragOver] = useState(false)
   const stageSurface = useRef<HTMLDivElement>(null)
-  const [dragPreview, setDragPreview] = useState<{ device: DeviceSummary; x: number; y: number; width: number; height: number } | null>(null)
+  const [dragPreview, setDragPreview] = useState<{
+    device: DeviceSummary
+    clientX: number
+    clientY: number
+    widthPx: number
+    heightPx: number
+    insideStage: boolean
+  } | null>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const nativeDragDeviceRef = useRef<DeviceSummary | null>(null)
+  const nativeDragElRef = useRef<HTMLElement | null>(null)
+  const isDragging = Boolean(nativeDragDeviceRef.current || dragPreview)
   const [openAccordion, setOpenAccordion] = useState<AccordionKey | null>(null)
   const [pinnedAccordions, setPinnedAccordions] = useState<AccordionKey[]>([])
   const [baseColor, setBaseColor] = useState(() => (
@@ -962,24 +973,25 @@ function App() {
   // Listen for custom drag events from `useDraggable` so the stage highlights on touch drags
   useEffect(() => {
     let prevTouchAction: string | null = null
+    const PREVIEW_SCALE = 0.64
 
     const onDragMove = (ev: Event) => {
       const detail = (ev as CustomEvent)?.detail
-      if (!detail || !stageSurface.current) return
+      if (!detail) return
       const { clientX, clientY, payload } = detail
-      const bounds = stageSurface.current.getBoundingClientRect()
-      const inside = clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom
+      const dev = payload as DeviceSummary
+      const defaultSize = getDefaultDeviceSize(dev)
+      const bounds = stageSurface.current?.getBoundingClientRect()
+
+      const inside = bounds ? (clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom) : false
       setIsStageDragOver(inside)
 
-      // compute preview placement in percent
+      // compute preview pixel size (smaller than final)
       try {
-        const dev = payload as DeviceSummary
-        const defaultSize = getDefaultDeviceSize(dev)
-        const dropX = ((clientX - bounds.left) / bounds.width) * 100
-        const dropY = ((clientY - bounds.top) / bounds.height) * 100
-        const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
-        const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
-        setDragPreview({ device: dev, x, y, width: defaultSize.width, height: defaultSize.height })
+        const previewWidthPx = bounds ? Math.max(36, Math.round((defaultSize.width / 100) * bounds.width * PREVIEW_SCALE)) : 56
+        const previewHeightPx = bounds ? Math.max(28, Math.round((defaultSize.height / 100) * bounds.height * PREVIEW_SCALE)) : 36
+
+        setDragPreview({ device: dev, clientX, clientY, widthPx: previewWidthPx, heightPx: previewHeightPx, insideStage: inside })
       } catch (e) {
         setDragPreview(null)
       }
@@ -1003,11 +1015,42 @@ function App() {
     window.addEventListener('figdev-dragmove', onDragMove as EventListener)
     window.addEventListener('figdev-dragstart', onDragStart as EventListener)
     window.addEventListener('figdev-dragend', onDragEnd as EventListener)
+    // update preview while a native HTML5 drag is in progress
+    const onNativeDrag = (ev: DragEvent) => {
+      const dev = nativeDragDeviceRef.current
+      if (!dev) return
+      const clientX = ev.clientX
+      const clientY = ev.clientY
+      const bounds = stageSurface.current?.getBoundingClientRect()
+      const inside = bounds ? (clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom) : false
+      setIsStageDragOver(inside)
+      const defaultSize = getDefaultDeviceSize(dev)
+      const previewWidthPx = bounds ? Math.max(36, Math.round((defaultSize.width / 100) * bounds.width * PREVIEW_SCALE)) : 56
+      const previewHeightPx = bounds ? Math.max(28, Math.round((defaultSize.height / 100) * bounds.height * PREVIEW_SCALE)) : 36
+      setDragPreview({ device: dev, clientX, clientY, widthPx: previewWidthPx, heightPx: previewHeightPx, insideStage: inside })
+    }
+
+    // clear native drag tracking when a native drag ends anywhere
+    const onNativeDragEnd = () => {
+      nativeDragDeviceRef.current = null
+      setDragPreview(null)
+      setIsStageDragOver(false)
+      try {
+        if (nativeDragElRef.current) {
+          nativeDragElRef.current.classList.remove('figdev__device--dragging')
+          nativeDragElRef.current = null
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('drag', onNativeDrag as EventListener)
+    window.addEventListener('dragend', onNativeDragEnd as EventListener)
 
     return () => {
       window.removeEventListener('figdev-dragmove', onDragMove as EventListener)
       window.removeEventListener('figdev-dragstart', onDragStart as EventListener)
       window.removeEventListener('figdev-dragend', onDragEnd as EventListener)
+      window.removeEventListener('drag', onNativeDrag as EventListener)
+      window.removeEventListener('dragend', onNativeDragEnd as EventListener)
       if (stageSurface.current) stageSurface.current.style.touchAction = prevTouchAction ?? ''
     }
   }, [stageSurface])
@@ -1079,18 +1122,53 @@ function App() {
     const dropY = bounds ? ((clientY - bounds.top) / bounds.height) * 100 : 12
     const x = Math.max(0, Math.min(100 - defaultSize.width, dropX - defaultSize.width / 2))
     const y = Math.max(0, Math.min(100 - defaultSize.height, dropY - defaultSize.height / 2))
+    const commitPlacement = () => {
+      setPlacedDevices((current) => [
+        ...current,
+        {
+          ...device,
+          instanceId: `${device.id}-${Date.now()}`,
+          x,
+          y,
+          width: defaultSize.width,
+          height: defaultSize.height,
+        },
+      ])
+    }
 
-    setPlacedDevices((current) => [
-      ...current,
-      {
-        ...device,
-        instanceId: `${device.id}-${Date.now()}`,
-        x,
-        y,
-        width: defaultSize.width,
-        height: defaultSize.height,
-      },
-    ])
+    // If we have an active preview element, animate it to the final size/position
+    if (dragPreview && previewRef.current && stageSurface.current) {
+      const previewEl = previewRef.current
+      const stageBounds = stageSurface.current.getBoundingClientRect()
+      const finalLeftPx = stageBounds.left + (x / 100) * stageBounds.width
+      const finalTopPx = stageBounds.top + (y / 100) * stageBounds.height
+      const finalWpx = Math.round((defaultSize.width / 100) * stageBounds.width)
+      const finalHpx = Math.round((defaultSize.height / 100) * stageBounds.height)
+
+      // animate preview center to final center, keeping translate(-50%,-50%) centering
+      const finalCenterX = finalLeftPx + finalWpx / 2
+      const finalCenterY = finalTopPx + finalHpx / 2
+
+      try {
+        gsap.to(previewEl, {
+          left: finalCenterX,
+          top: finalCenterY,
+          width: finalWpx,
+          height: finalHpx,
+          duration: 0.22,
+          ease: 'power2.out',
+          onComplete: () => {
+            commitPlacement()
+            setDragPreview(null)
+          },
+        })
+        return
+      } catch (e) {
+        // fall through to immediate placement on error
+      }
+    }
+
+    commitPlacement()
   }
 
   const beginCable = (device: DeviceSummary, port: DeviceSummary['physicalPorts'][number], event: React.PointerEvent<HTMLButtonElement>) => {
@@ -1166,7 +1244,7 @@ function App() {
   }
 
   return (
-    <div className="figdev__app" ref={container}>
+    <div className={`figdev__app ${isDragging && !isStageDragOver ? 'figdev__dragging-outside' : ''}`} ref={container}>
       <aside className="figdev__sidebar figdev__reveal">
         <div className="figdev__brand" aria-label="Live Audio Simulator">
           <span className="figdev__brand-pulse" />
@@ -1182,17 +1260,48 @@ function App() {
           <p className="figdev__sidebar-label">Stage devices</p>
           {catalog ? (
             <>
-              <DeviceAccordion title="Sources" devices={catalog.sources} isOpen={isAccordionOpen('sources')} isPinned={pinnedAccordions.includes('sources')} onToggle={(event) => toggleAccordion('sources', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
-                event.dataTransfer.setData('application/x-figdev-device', device.id)
-                event.dataTransfer.effectAllowed = 'copy'
-              }} onDevicePointerDrop={placeDeviceAt} />
+                    <DeviceAccordion title="Sources" devices={catalog.sources} isOpen={isAccordionOpen('sources')} isPinned={pinnedAccordions.includes('sources')} onToggle={(event) => toggleAccordion('sources', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
+                      event.dataTransfer.setData('application/x-figdev-device', device.id)
+                      event.dataTransfer.effectAllowed = 'copy'
+                      nativeDragDeviceRef.current = device
+                      try {
+                        // hide the native drag image and visually hide the source element
+                        const img = new Image()
+                        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+                        event.dataTransfer.setDragImage(img, 0, 0)
+                      } catch (e) {}
+                      try {
+                        nativeDragElRef.current = event.currentTarget as HTMLElement
+                        nativeDragElRef.current.classList.add('figdev__device--dragging')
+                      } catch (e) {}
+                    }} onDevicePointerDrop={placeDeviceAt} />
               <DeviceAccordion title="Outputs" devices={catalog.outputs} isOpen={isAccordionOpen('outputs')} isPinned={pinnedAccordions.includes('outputs')} onToggle={(event) => toggleAccordion('outputs', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
+                nativeDragDeviceRef.current = device
+                try {
+                  const img = new Image()
+                  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+                  event.dataTransfer.setDragImage(img, 0, 0)
+                } catch (e) {}
+                try {
+                  nativeDragElRef.current = event.currentTarget as HTMLElement
+                  nativeDragElRef.current.classList.add('figdev__device--dragging')
+                } catch (e) {}
               }} onDevicePointerDrop={placeDeviceAt} />
               <DeviceAccordion title="Process devices" devices={catalog.processors} isOpen={isAccordionOpen('processors')} isPinned={pinnedAccordions.includes('processors')} onToggle={(event) => toggleAccordion('processors', event)} onDeviceClick={setSelectedDevice} onDeviceDragStart={(device, event) => {
                 event.dataTransfer.setData('application/x-figdev-device', device.id)
                 event.dataTransfer.effectAllowed = 'copy'
+                nativeDragDeviceRef.current = device
+                try {
+                  const img = new Image()
+                  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+                  event.dataTransfer.setDragImage(img, 0, 0)
+                } catch (e) {}
+                try {
+                  nativeDragElRef.current = event.currentTarget as HTMLElement
+                  nativeDragElRef.current.classList.add('figdev__device--dragging')
+                } catch (e) {}
               }} onDevicePointerDrop={placeDeviceAt} />
             </>
           ) : (
@@ -1202,7 +1311,7 @@ function App() {
           )}
         </div>
         <SettingsPanel baseColor={baseColor} onColorChange={setBaseColor} theme={theme} onThemeChange={setTheme} isOpen={isAccordionOpen('settings')} isPinned={pinnedAccordions.includes('settings')} onToggle={(event) => toggleAccordion('settings', event)} />
-        <p className="figdev__sidebar-footer">Build 0.1.0</p>
+        <p className="figdev__sidebar-footer">Build 0.1.1</p>
       </aside>
 
       <main className="figdev__main" id="studio">
@@ -1219,8 +1328,20 @@ function App() {
           onDragOver={(event) => {
             event.preventDefault()
             setIsStageDragOver(true)
+            // if this is a native drag (desktop), show compact preview
+            const dev = nativeDragDeviceRef.current
+            if (dev && stageSurface.current) {
+              const bounds = stageSurface.current.getBoundingClientRect()
+              const defaultSize = getDefaultDeviceSize(dev)
+              const previewWidthPx = Math.max(36, Math.round((defaultSize.width / 100) * bounds.width * 0.64))
+              const previewHeightPx = Math.max(28, Math.round((defaultSize.height / 100) * bounds.height * 0.64))
+              setDragPreview({ device: dev, clientX: event.clientX, clientY: event.clientY, widthPx: previewWidthPx, heightPx: previewHeightPx, insideStage: true })
+            }
           }}
-          onDragLeave={() => setIsStageDragOver(false)}
+          onDragLeave={() => {
+            setIsStageDragOver(false)
+            setDragPreview(null)
+          }}
           onDrop={handleDeviceDrop}
         >
           <div className="figdev__stage-audience">AUDIENCE / PUBLIC SIDE</div>
@@ -1233,23 +1354,7 @@ function App() {
               stageRef={stageSurface}
               onDeleteCable={(cableId) => setCables((current) => current.filter((cable) => cable.id !== cableId))}
             />
-            {dragPreview && (
-              <div
-                className="figdev__stage-preview"
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  left: `${dragPreview.x}%`,
-                  top: `${dragPreview.y}%`,
-                  width: `${dragPreview.width}%`,
-                  height: `${dragPreview.height}%`,
-                  border: '2px dashed rgba(0,0,0,0.18)',
-                  background: 'rgba(0,0,0,0.02)',
-                  pointerEvents: 'none',
-                  zIndex: 50,
-                }}
-              />
-            )}
+            { /* preview is rendered at app root so it's visible outside the stage */ }
             {placedDevices.length > 0 ? placedDevices.map((device) => (
               <PlacedDeviceGraphic
                 key={device.instanceId}
@@ -1276,6 +1381,40 @@ function App() {
             <span><i className="figdev__legend-swatch figdev__legend-swatch--bidirectional" /> BIDIRECTIONAL</span>
           </div>
         </section>
+        {/* Fixed preview rendered at root so it follows the pointer even outside the stage */}
+        {dragPreview && (
+          <div
+            className="figdev__stage-preview"
+            ref={previewRef}
+            aria-hidden="true"
+            style={{
+              position: 'fixed',
+              left: `${dragPreview.clientX}px`,
+              top: `${dragPreview.clientY}px`,
+              width: `${dragPreview.widthPx}px`,
+              height: `${dragPreview.heightPx}px`,
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              willChange: 'left,top,width,height,transform',
+            }}
+          >
+            <div className="figdev__preview-inner" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.32rem 0.6rem', borderRadius: '0.45rem', border: '1px solid var(--line)', background: 'var(--figdev-label-background)', pointerEvents: 'none' }}>
+              {(() => {
+                const Icon = getDeviceIcon(dragPreview.device)
+                return (
+                  <>
+                    <Icon className="figdev__preview-icon" size={16} />
+                    <span className="figdev__preview-name" style={{ fontSize: '0.68rem', fontWeight: 600 }}>{dragPreview.device.name}</span>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        )}
       </main>
       <DeviceFullInfo device={selectedDevice} onClose={() => setSelectedDevice(null)} />
       {isSessionOpen && <SessionModal onClose={() => setIsSessionOpen(false)} />}

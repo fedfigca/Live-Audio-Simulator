@@ -49,3 +49,11 @@ The detailed contributor guide is in [CONTRIBUTING.md](CONTRIBUTING.md). It cove
 - Define the palette from `--figdev-base-color: #232c22` and retain `--figdev-dark-base: #111411` as the dark contrast anchor.
 - Derive surface, text, border, accent, waveform, and track colors with modern `color-mix()` and relative `oklch()` calculations instead of adding isolated hex values.
 - The current mode is explicitly `color-scheme: dark`. Keep the token structure ready for a future light/dark mode layer without adding a toggle yet.
+
+## Recent changes (drag + mobile)
+
+- Mobile drag fallback: long-press gesture with a viewport-fixed preview so drag previews are visible outside the Stage.
+- Preview animate-into-place: GSAP expands the fixed preview into the Stage on drop for a smooth placement effect.
+- Visual fixes: source elements are hidden during drag to avoid duplicate visuals; touch scroll is prevented while dragging; move events are throttled with RAF.
+
+See [CHANGELOG.md](CHANGELOG.md) for details.
